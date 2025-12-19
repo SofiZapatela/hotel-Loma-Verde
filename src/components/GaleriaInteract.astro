@@ -1,0 +1,116 @@
+---
+import "aos/dist/aos.css";
+import Filtros from './Filtros.astro';
+import Galeria from './Galeria.astro';
+
+// --- 1. DATOS DE EJEMPLO (AHORA DENTRO DEL COMPONENTE) ---
+const itemsGaleria = [
+  { id: 1, titulo: "Piscina", categoria: "Naturaleza", imagenUrl: "/hotel1.jpg" },
+  { id: 2, titulo: "Retrato de Estudio", categoria: "Personas", imagenUrl: "/personas.jpg" },
+  { id: 3, titulo: "Hotel", categoria: "Arquitectura", imagenUrl: "/hotel2.jpg" },
+  { id: 4, titulo: "Flor Exótica", categoria: "Naturaleza", imagenUrl: "/naturaleza.jpg" },
+  { id: 5, titulo: "Restaurante", categoria: "Arquitectura", imagenUrl: "/restaurante-nat.jpg" },
+  { id: 6, titulo: "Sonrisa Casual", categoria: "Personas", imagenUrl: "/feliz.jpg" },
+
+];
+
+// El filtro inicial. Debe ser uno de los disponibles.
+const filtroInicial = "Todos";
+// Obtener todas las categorías únicas, excluyendo "Todos" si ya existe en los datos
+const categoriasUnicas = [
+  "Todos", // Añadimos "Todos" manualmente (será el primer botón)
+  ...new Set(
+    itemsGaleria
+      .map(item => item.categoria)
+      .filter(categoria => categoria !== "Todos") // <--- ¡CLAVE! Filtramos el valor "Todos" de los datos
+  )
+];
+// Lógica de filtrado inicial para la renderización SSR
+const itemsInicialesFiltrados = itemsGaleria.filter(item => filtroInicial === "Todos" || item.categoria === filtroInicial);
+---
+
+  <!-- Título -->
+<section id="galeria"  class="bg-[#FAF9F6] py-24 px-6">
+    <div class="max-w-6xl mx-auto text-center mb-16" data-aos="fade-up">
+    <h2 class="text-4xl text-[#4F382B] mb-4 tracking-tight font-cormorant">GALERIA</h2>
+
+    <Filtros filtros={categoriasUnicas} filtroActivo={filtroInicial} />
+
+    <div id="galeria-contenedor">
+        <Galeria items={itemsInicialesFiltrados} />
+    </div>
+    </div>
+</section>
+
+
+<script define:vars={{ itemsGaleria, filtroInicial, categoriasUnicas }}>
+  // Script para gestionar el estado y la renderización en el cliente.
+  
+  // Variables pasadas desde el Frontmatter
+  const items = itemsGaleria; 
+  const contenedorGaleria = document.getElementById('galeria-contenedor');
+  const contenedorFiltros = document.getElementById('filtro-botones');
+  let filtroActivo = filtroInicial; // Estado inicial
+
+  // Función para crear el HTML de un ítem de la galería
+  function crearItemHTML(item) {
+    return `
+      <div>
+        <img
+          src="${item.imagenUrl}"
+          alt="${item.titulo}"
+          class="w-full h-60 object-cover rounded-md mb-4"
+        />
+      </div>
+    `;
+  }
+
+  // Función principal para filtrar y renderizar
+  function renderizarGaleria(nuevoFiltro) {
+    filtroActivo = nuevoFiltro;
+
+    // 1. Lógica de Filtrado
+    const itemsFiltrados = items.filter(item => {
+      return filtroActivo === "Todos" || item.categoria === filtroActivo;
+    });
+
+    // 2. Actualizar estilos de botones
+    contenedorFiltros.querySelectorAll('button').forEach(btn => {
+      const filtroDelBoton = btn.getAttribute('data-filtro');
+      
+      if (filtroDelBoton === filtroActivo) {
+        // --- ESTADO ACTIVO ---
+        // 1. Añadir clases activas (Fondo: 1F3333, Texto: white)
+        btn.classList.add('bg-[#1F3333]', 'text-white', 'shadow-lg');
+        
+        // 2. Quitar TODAS las clases de fondo y texto inactivo
+        btn.classList.remove('bg-[#ECE4D5]', 'text-[#1F3333]', 'hover:bg-[#ECE4D5]'); 
+        
+      } else {
+        // --- ESTADO INACTIVO (SIN FONDO) ---
+        // 1. Quitar TODAS las clases del estado activo
+        btn.classList.remove('bg-[#1F3333]', 'text-white', 'shadow-lg');
+        
+        // 2. Añadir solo clases inactivas (Texto: 8B9D6C, Hover: ECE4D5)
+        // La clase 'bg-[#ECE4D5]' no se añade, lo que mantiene el fondo transparente.
+        btn.classList.add('text-[#1F3333]', 'hover:bg-[#ECE4D5]'); 
+        
+        // Asegúrate de remover explícitamente el fondo inactivo si estaba antes
+        btn.classList.remove('bg-[#ECE4D5]');
+      }
+    });
+
+    // 3. Crear el nuevo HTML de la galería
+    const nuevoHTML = itemsFiltrados.map(crearItemHTML).join('');
+
+    // 4. Actualizar el DOM
+    contenedorGaleria.innerHTML = `<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">${nuevoHTML}</div>`;
+  }
+
+  // Escuchar el evento personalizado disparado por el componente Filtros.astro
+  document.addEventListener('cambioFiltro', (event) => {
+    // @ts-ignore
+    const nuevoFiltro = event.detail.nuevoFiltro;
+    renderizarGaleria(nuevoFiltro);
+  });
+</script>

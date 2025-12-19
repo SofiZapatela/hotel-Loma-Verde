@@ -1,0 +1,26 @@
+---
+/* solo CSS en build */
+import "aos/dist/aos.css";
+---
+<!-- el script se enviará al navegador cuando el componente se hidrate -->
+<script>
+  (async () => {
+    try {
+      const mod = await import('aos');              // import dinámico en navegador
+      const AOS = mod.default ?? mod;
+
+      // Ejecutar en la siguiente animación para asegurarnos que el DOM está "listo"
+      requestAnimationFrame(() => {
+        AOS.init({ duration: 800, once: true });
+        // force refresh por las dudas
+        if (typeof AOS.refresh === 'function') AOS.refresh();
+        if (typeof AOS.refreshHard === 'function') AOS.refreshHard();
+        // Exponer para debug
+        window.__AOS = AOS;
+        console.log('AOS inicializado', AOS);
+      });
+    } catch (err) {
+      console.error('Error cargando AOS dinámicamente:', err);
+    }
+  })();
+</script>

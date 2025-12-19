@@ -1,0 +1,67 @@
+---
+// Importaciones de Node/Astro (Solo las necesarias)
+// Se eliminan las importaciones de Firebase, Bloqueo y getDocs porque la lógica de BD se movió al cliente.
+import Layout from '../layouts/Layout.astro';
+import ReservaForm from '../components/ReservaForm.astro';
+// ⭐️ Se mantiene la importación de datos de habitaciones ⭐️
+import { ROOM_DATA } from '../utils/room-data.ts'; 
+
+
+// ⭐️ AÑADIR CONFIGURACIÓN DE FIREBASE PARA INYECTAR EN EL CLIENTE ⭐️
+const firebaseConfig = {
+    apiKey: import.meta.env.PUBLIC_FIREBASE_API_KEY,
+    authDomain: import.meta.env.PUBLIC_FIREBASE_AUTH_DOMAIN,
+    projectId: import.meta.env.PUBLIC_FIREBASE_PROJECT_ID,
+};
+
+// Convertir a string para inyección en el cliente.
+const firebaseConfigJson = JSON.stringify(firebaseConfig);
+
+// 1. Definición de las habitaciones para mostrarlas
+// Usar Object.entries() para preservar el ID de la habitación (la clave) 
+const habitaciones = Object.entries(ROOM_DATA).map(([id, data]) => ({
+    id: id, // El ID de la habitación ahora está correctamente incluido
+    ...data // El resto de las propiedades (nombre, unidades, descripcion, precioBase, etc.)
+}));
+
+// 2. Eliminamos toda la lógica de inicialización de Firebase y carga de 'bloqueos'.
+// Esa información es cargada ahora por el script de ReservaForm en el cliente.
+console.log(`[reservar.astro] Habitaciones disponibles cargadas: ${habitaciones.length}`);
+---
+
+<Layout title="Reservar en Loma Verde Lodge">
+    <section class="py-20 bg-[#FAF9F6] px-6">
+        <div class="max-w-6xl mx-auto">
+            
+            <header class="text-center mb-16">
+                <h1 class="text-5xl text-[#1F3333] font-cormorant mb-4">
+                    Verificar Disponibilidad y Reservar
+                </h1>
+                <p class="text-lg text-[#8B9D6C] font-semibold">
+                    Seleccione sus fechas, habitación y número de huéspedes.
+                </p>
+            </header>
+
+            <!-- ⭐️ AÑADIR data-firebase-config para asegurar la inyección de la configuración ⭐️ -->
+            <ReservaForm 
+                habitaciones={habitaciones} 
+                data-firebase-config={firebaseConfigJson} 
+                client:load 
+            />
+
+            <h2 class="text-3xl font-cormorant text-[#1F3333] mt-20 mb-8 border-b border-[#ECE4D5] pb-2">
+                Nuestras Opciones
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                {habitaciones.map((hab) => (
+                    <div class="p-4 border border-[#ECE4D5] rounded-lg bg-white shadow-sm">
+                        <h3 class="text-xl font-bold text-[#4F382B] mb-2">{hab.nombre}</h3>
+                        <p class="text-gray-700">{hab.descripcion}</p>
+                        <p class="text-sm text-[#8B9D6C] mt-2">Precio base por noche: USD ${hab.precioBase}</p>
+                    </div>
+                ))}
+            </div>
+
+        </div>
+    </section>
+</Layout>

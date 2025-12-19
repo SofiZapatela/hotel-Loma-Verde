@@ -1,0 +1,129 @@
+---
+import Layout from '../../layouts/Layout.astro';
+
+// OBTENER LAS VARIABLES DE ENTORNO PÚBLICAS
+const firebaseConfig = {
+    apiKey: import.meta.env.PUBLIC_FIREBASE_API_KEY,
+    authDomain: import.meta.env.PUBLIC_FIREBASE_AUTH_DOMAIN,
+    projectId: import.meta.env.PUBLIC_FIREBASE_PROJECT_ID,
+};
+
+// CONVERTIR A STRING para pasar al script inlined
+const firebaseConfigJson = JSON.stringify(firebaseConfig);
+---
+
+<Layout title="Acceso a Gestión | Loma Verde Lodge">
+    <section class="py-24 bg-[#FAF9F6] min-h-screen flex items-center justify-center px-4">
+        <div class="max-w-md w-full p-8 rounded-xl shadow-2xl bg-white border border-[#ECE4D5]">
+            <header class="text-center mb-8">
+                <h2 class="font-cormorant text-3xl font-bold text-[#1F3333]">
+                    Acceso al Dashboard
+                </h2>
+                <p class="text-[#8B9D6C] mt-2">
+                    Ingresa tus credenciales de hotel para gestionar las reservas.
+                </p>
+                <div id="auth-error-message" class="mt-4 text-red-600 font-medium hidden"></div>
+            </header>
+
+            <form id="login-form" class="space-y-6">
+                <div>
+                    <label for="email" class="block text-sm font-medium text-[#1F3333] mb-2">Correo Electrónico</label>
+                    <input type="email" id="email" required 
+                        class="w-full p-3 border border-[#ECE4D5] rounded-lg bg-gray-50 focus:border-[#8B9D6C] focus:ring-[#8B9D6C] text-[#1F3333]"
+                        placeholder="admin@hotel.com">
+                </div>
+                <div>
+                    <label for="password" class="block text-sm font-medium text-[#1F3333] mb-2">Contraseña</label>
+                    <input type="password" id="password" required 
+                        class="w-full p-3 border border-[#ECE4D5] rounded-lg bg-gray-50 focus:border-[#8B9D6C] focus:ring-[#8B9D6C] text-[#1F3333]"
+                        placeholder="• • • • • • • •">
+                </div>
+
+                <div class="pt-4">
+                    <button type="submit" id="login-button"
+                        class="w-full inline-block text-base px-16 py-3 rounded-full 
+                                text-[#ECE4D5] bg-[#1F3333] font-bold 
+                                hover:bg-[#4F382B] transition shadow-md disabled:opacity-50"
+                    >
+                        Iniciar Sesión
+                    </button>
+                </div>
+            </form>
+        </div>
+    </section>
+</Layout>
+
+<script type="module">
+    // Recuperar la configuración del servidor
+    const scriptTag = document.querySelector('script[data-config-login]');
+    const firebaseConfigRaw = scriptTag ? scriptTag.dataset.configLogin : null;
+    let firebaseConfig;
+
+    try {
+        firebaseConfig = JSON.parse(firebaseConfigRaw);
+        if (!firebaseConfig || !firebaseConfig.apiKey) throw new Error("Firebase config missing or invalid.");
+    } catch (e) {
+        console.error("Error al parsear la configuración de Firebase:", e);
+        // Si no funciona, el login fallará, pero al menos no habrá un placeholder.
+    }
+    
+    // --- Lógica de Autenticación de Firebase ---
+    
+    import { initializeApp, getApps } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
+    import { getAuth, signInWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
+
+    // Inicializar la aplicación solo si tenemos la configuración
+    const app = firebaseConfig ? (getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0]) : null;
+    const auth = app ? getAuth(app) : null;
+    
+    const form = document.getElementById('login-form');
+    const emailInput = document.getElementById('email');
+    const passwordInput = document.getElementById('password');
+    const errorMessageDiv = document.getElementById('auth-error-message');
+    const loginButton = document.getElementById('login-button');
+
+    // Deshabilitar el formulario si no hay Auth
+    if (!auth) {
+        errorMessageDiv.textContent = "Error de configuración: Claves de Firebase faltantes o incorrectas.";
+        errorMessageDiv.classList.remove('hidden');
+        loginButton.disabled = true;
+    }
+
+    // Manejar el inicio de sesión
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        if (!auth) return; // Salir si no se inicializó Firebase
+        
+        const email = emailInput.value;
+        const password = passwordInput.value;
+        
+        errorMessageDiv.classList.add('hidden');
+        errorMessageDiv.textContent = '';
+        loginButton.disabled = true;
+
+        try {
+            await signInWithEmailAndPassword(auth, email, password); 
+            
+            // Éxito: Redirigir al dashboard principal
+            window.location.href = '/dashboard';
+
+        } catch (error) {
+            console.error("Error de inicio de sesión:", error);
+            
+            let message = "Error desconocido.";
+            if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/user-disabled') {
+                message = "Credenciales incorrectas. Verifica el email y la contraseña.";
+            } else if (error.code === 'auth/invalid-email') {
+                message = "El formato del email es inválido.";
+            }
+            
+            errorMessageDiv.textContent = message;
+            errorMessageDiv.classList.remove('hidden');
+            loginButton.disabled = false;
+        }
+    });
+
+</script>
+<!-- INYECTAR LA CONFIGURACIÓN EN EL ELEMENTO SCRIPT -->
+<script type="text/javascript" data-config-login={firebaseConfigJson}></script>

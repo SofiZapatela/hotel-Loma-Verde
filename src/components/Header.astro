@@ -1,0 +1,35 @@
+---
+import Navbar from "./Navbar.astro";
+import "aos/dist/aos.css";
+---
+
+<header 
+  class="w-full sm:h-[80vh] h-[60vh] bg-cover bg-center bg-no-repeat relative" 
+  style="background-image: url('/hotel.jpg');"
+>
+
+  <!-- Overlay para oscurecer la imagen -->
+  <div class="absolute inset-0 bg-black/40"></div>
+
+  <!-- Contenido centrado -->
+  <section 
+    class="relative z-10 h-full flex flex-col items-center justify-center text-center px-4"
+    data-aos="fade-up"
+  >
+    <h2 class="font-cormorant text-5xl font-bold mb-4 text-[#DED1C6]">LOMA VERDE LODGE</h2>
+
+    <h3 class="text-xl font-light text-[#DED1C6]">
+      Descubra el lujo de volver a lo esencial
+    </h3>
+
+    <a 
+      href="/reservar" 
+      class="mt-8 inline-block text-base px-12 py-4 rounded-full 
+             text-[#1F3333] bg-[#DED1C6] font-bold
+             hover:bg-[#4F382B] hover:text-white transition"
+    >
+      Reservar
+    </a>
+  </section>
+
+</header>

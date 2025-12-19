@@ -1,0 +1,578 @@
+
+<div class="space-y-10">
+
+
+    <!-- 1. Calendario de Inventario por Habitación -->
+    <div class="bg-white p-6 rounded-xl shadow-lg border border-[#ECE4D5] overflow-x-auto">
+        <h2 class="font-cormorant text-2xl font-bold text-[#1F3333] mb-4">
+            Disponibilidad y Bloqueos (Inventario)
+        </h2>
+        <div id="calendar-header" class="flex justify-between items-center mb-4">
+            <button id="prev-month" class="text-[#1F3333] hover:text-[#8B9D6C] font-bold py-1 px-3 rounded-full transition">
+                &lt; Anterior
+            </button>
+            <h3 id="current-month-year" class="font-cormorant text-xl font-semibold text-[#1F3333] min-w-[200px] text-center"></h3>
+            <button id="next-month" class="text-[#1F3333] hover:text-[#8B9D6C] font-bold py-1 px-3 rounded-full transition">
+                Siguiente &gt;
+            </button>
+        </div>
+        
+        <div id="calendar-loader" class="text-center py-4 text-[#8B9D6C]">Cargando calendario...</div>
+        <div id="calendar-error" class="text-red-600 font-medium hidden"></div>
+
+        <div id="inventory-calendar-container" class="min-w-[700px]">
+            <!-- Leyenda de colores -->
+            <div class="flex space-x-4 mb-4 text-sm justify-end">
+                <span class="flex items-center">
+                    <span class="h-3 w-3 bg-green-500 rounded-full mr-2"></span> Disponible
+                </span>
+                <span class="flex items-center">
+                    <span class="h-3 w-3 bg-yellow-400 rounded-full mr-2"></span> Bloqueo Parcial
+                </span>
+                <span class="flex items-center">
+                    <span class="h-3 w-3 bg-red-500 rounded-full mr-2"></span> Sin Disponibilidad (Lleno)
+                </span>
+            </div>
+
+            <!-- Aquí se inyecta la vista de calendario basada en inventario -->
+            <div id="inventory-calendar"></div>
+        </div>
+    </div>
+
+
+    <!-- 2. Tabla de Reservas Pendientes y Confirmadas (Con todos los datos) -->
+    <div class="bg-white p-6 rounded-xl shadow-lg border border-[#ECE4D5]">
+        <h2 class="font-cormorant text-2xl font-bold text-[#1F3333] mb-4">
+            Reservas Recientes
+        </h2>
+        <div id="loading-reservas" class="text-center py-8 text-[#8B9D6C]">Cargando reservas...</div>
+        <div id="reservas-error" class="text-red-600 font-medium hidden"></div>
+
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-[#ECE4D5]">
+                <thead class="bg-[#FAF9F6]">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-[#1F3333] uppercase tracking-wider">ID</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-[#1F3333] uppercase tracking-wider">Nombre</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-[#1F3333] uppercase tracking-wider">Habitación</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-[#1F3333] uppercase tracking-wider">Entrada / Salida</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-[#1F3333] uppercase tracking-wider">Huéspedes</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-[#1F3333] uppercase tracking-wider">Teléfono / Email</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-[#1F3333] uppercase tracking-wider">Precio Est.</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-[#1F3333] uppercase tracking-wider">Estado</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-[#1F3333] uppercase tracking-wider">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="reservas-tbody" class="bg-white divide-y divide-[#ECE4D5]">
+                    <!-- Contenido de las reservas inyectado por JS -->
+                </tbody>
+            </table>
+        </div>
+        
+    </div>
+</div>
+
+<!-- MODAL Agregar Bloqueo Manual -->
+<div id="modal-bloqueo" class="fixed inset-0 bg-black bg-opacity-40 hidden justify-center items-center">
+    <div class="bg-white p-6 rounded-xl w-96 shadow-xl">
+        <h2 class="text-xl font-bold text-[#1F3333] mb-4">
+            Nuevo Bloqueo Manual
+        </h2>
+
+        <label class="block mb-2 text-sm">Habitación:</label>
+        <select id="bloq-habitacion" class="w-full p-2 border rounded mb-4">
+            <!-- Se completa por JS con ROOM_DATA -->
+        </select>
+
+        <label class="block mb-2 text-sm">Fecha inicio:</label>
+        <input type="date" id="bloq-inicio" class="w-full p-2 border rounded mb-4">
+
+        <label class="block mb-2 text-sm">Fecha fin:</label>
+        <input type="date" id="bloq-fin" class="w-full p-2 border rounded mb-4">
+
+        <label class="block mb-2 text-sm">Unidades bloqueadas:</label>
+        <input type="number" id="bloq-cantidad" min="1" value="1" class="w-full p-2 border rounded mb-4">
+
+        <div class="flex justify-end space-x-3">
+            <button id="cerrar-modal" class="px-4 py-2 border rounded">Cancelar</button>
+            <button id="guardar-bloqueo" class="px-4 py-2 bg-[#1F3333] text-white rounded">Guardar</button>
+        </div>
+    </div>
+</div>
+
+
+<!-- Reemplazá tu <script type="module"> por ESTE -->
+<script type="module">
+
+    const appId = "default-app-id";
+    // Importamos las librerías de Firebase necesarias
+    import { getApps, getApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
+    // Importamos `or` para consultar múltiples campos de estado en las reservas
+    import { getFirestore, collection, query, addDoc, onSnapshot, updateDoc, doc, orderBy, where, serverTimestamp, getDocs, or } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+
+    // =========================================================
+    // ⭐️ CORRECCIÓN CRÍTICA: Se debe importar ROOM_DATA para acceder a los nombres y datos completos. ⭐️
+    // Se asume que el path '/availability_checker.js' es el alias correcto para 'src/utils/room-data.ts'.
+    import { ROOM_DATA, ROOM_INVENTORY, createLocalTimeDate } from '/availability_checker.js'; 
+
+    // BOTÓN Y MODAL
+    const btnAddBloqueo = document.getElementById('btn-add-bloqueo');
+    const modalBloqueo = document.getElementById('modal-bloqueo');
+    const cerrarModal = document.getElementById('cerrar-modal');
+    const guardarBloqueo = document.getElementById('guardar-bloqueo');
+
+    // Inputs
+    const selHabitacion = document.getElementById('bloq-habitacion');
+    const inpInicio = document.getElementById('bloq-inicio');
+    const inpFin = document.getElementById('bloq-fin');
+    const inpCantidad = document.getElementById('bloq-cantidad');
+
+    // 1. Llenar el select con ROOM_DATA
+    function loadRoomOptions() {
+        selHabitacion.innerHTML = "";
+
+        Object.keys(ROOM_DATA).forEach(id => {
+            const opt = document.createElement("option");
+            opt.value = id;
+            opt.textContent = ROOM_DATA[id].nombre;
+            selHabitacion.appendChild(opt);
+        });
+    }
+
+    // 2. Abrir modal
+    btnAddBloqueo.addEventListener("click", () => {
+        loadRoomOptions();
+        modalBloqueo.classList.remove("hidden");
+        modalBloqueo.classList.add("flex");
+    });
+
+    // 3. Cerrar modal
+    cerrarModal.addEventListener("click", () => {
+        modalBloqueo.classList.add("hidden");
+    });
+
+    // 4. Guardar bloqueo manual en Firestore
+    guardarBloqueo.addEventListener("click", async () => {
+        const habitacion = selHabitacion.value;
+        const inicio = inpInicio.value;
+        const fin = inpFin.value;
+        const cantidad = parseInt(inpCantidad.value);
+
+        if (!habitacion || !inicio || !fin || cantidad <= 0) {
+            alert("Completa todos los campos.");
+            return;
+        }
+
+        try {
+            const bloqueosRef = collection(db, `artifacts/${appId}/public/data/bloqueos`);
+
+            await addDoc(bloqueosRef, {
+                habitacion,
+                // guardamos como Date en 00:00 local (tu previo enfoque)
+                fecha_inicio: new Date(inicio + "T00:00:00"),
+                fecha_fin: new Date(fin + "T00:00:00"),
+                cantidad_bloqueada: cantidad,
+                creado: serverTimestamp(),
+                tipo: "manual"
+            });
+
+            modalBloqueo.classList.add("hidden");
+
+            alert("Bloqueo agregado correctamente.");
+            // El onSnapshot se encargará de reflejarlo en el calendario
+
+        } catch (e) {
+            console.error("Error guardando bloqueo:", e);
+            alert("No se pudo guardar el bloqueo.");
+        }
+    });
+
+
+    const ROOM_TYPES = Object.keys(ROOM_INVENTORY);
+
+    // Variables globales
+    let currentDisplayDate = new Date(); // Inicia en el mes actual
+    let currentBloqueos = [];
+
+    // Elementos del DOM
+    const inventoryCalendarContainer = document.getElementById('inventory-calendar');
+    const currentMonthYear = document.getElementById('current-month-year');
+    const calendarLoader = document.getElementById('calendar-loader');
+    const calendarError = document.getElementById('calendar-error');
+    const prevMonthBtn = document.getElementById('prev-month');
+    const nextMonthBtn = document.getElementById('next-month');
+
+    // Instancia de Firestore
+    let db; 
+    
+    // --- FUNCIONES DE UTILIDAD DE FECHA ---
+    
+    function convertFirestoreTimestamp(timestamp) {
+        if (!timestamp || typeof timestamp.toDate !== 'function') return null;
+        
+        const date = timestamp.toDate();
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        
+        return `${year}-${month}-${day}`;
+    }
+
+    // --- Inicialización y Conexión a DB ---
+    function initializeDashboard() {
+        const app = getApps().length > 0 ? getApp() : null;
+        db = app ? getFirestore(app) : null; // Asignar a la variable global db
+        
+        const reservasTbody = document.getElementById('reservas-tbody');
+        const loadingReservas = document.getElementById('loading-reservas');
+        const reservasError = document.getElementById('reservas-error');
+
+        if (!db) {
+            if (window.retryCount === undefined) window.retryCount = 0;
+            if (window.retryCount < 5) {
+                window.retryCount++;
+                setTimeout(initializeDashboard, 100);
+                return;
+            }
+            console.error("Firestore no está inicializado. Revise la inicialización.");
+            reservasError.textContent = "Error: La base de datos no está disponible.";
+            reservasError.classList.remove('hidden');
+            loadingReservas.classList.add('hidden');
+            return;
+        }
+
+        console.log("Firestore inicializado correctamente en DashboardManager.");
+        window.retryCount = 0; 
+
+        // 1. Inicializar la tabla de reservas
+        initializeReservasTable(db, reservasTbody, loadingReservas, reservasError);
+
+        // 2. Inicializar el calendario de inventario, que ahora carga todo
+        initializeInventoryCalendar();
+        
+        // Asignar eventos de navegación
+        prevMonthBtn.addEventListener('click', () => changeMonth(-1));
+        nextMonthBtn.addEventListener('click', () => changeMonth(1));
+    } 
+
+    // --- Lógica de Fusión de Bloqueos (Reservas + Bloqueos Manuales) ---
+    function loadInventoryBlocks() {
+        if (!db) return;
+
+        // Nuevo origen de datos
+        const bloqueosRef = collection(db, `artifacts/${appId}/public/data/bloqueos`);
+        const reservasRef = collection(db, `artifacts/${appId}/public/data/reservas_clientes`);
+
+        // --- Bloqueos manuales ---
+        const bloqueosQuery = query(bloqueosRef);
+
+        // --- Reservas activas ---
+        const reservasQuery = query(
+            reservasRef,
+            where('estado', 'in', ['Confirmado', 'Solicitado'])
+        );
+
+        // onSnapshot de bloqueos manuales
+        const unsubscribeBloqueos = onSnapshot(bloqueosQuery, (querySnapshot) => {
+            let tempBloqueos = [];
+            
+            querySnapshot.forEach((doc) => {
+                const data = doc.data();
+                const roomID = data.habitacion ? data.habitacion.toLowerCase() : null;
+                const entradaString = convertFirestoreTimestamp(data.fecha_inicio);
+                const salidaString = convertFirestoreTimestamp(data.fecha_fin);
+                
+                if (roomID && ROOM_INVENTORY[roomID] && entradaString && salidaString) {
+                    tempBloqueos.push({
+                        habitacion: roomID,
+                        entrada: entradaString,
+                        salida: salidaString,
+                        cantidad: data.cantidad_bloqueada || 1,
+                        tipo: 'Bloqueo Manual'
+                    });
+                }
+            });
+
+            currentBloqueos = currentBloqueos.filter(b => b.tipo === 'Reserva');
+            currentBloqueos = currentBloqueos.concat(tempBloqueos);
+
+            renderInventoryCalendar(currentDisplayDate);
+        });
+
+        // onSnapshot reservas
+        const unsubscribeReservas = onSnapshot(reservasQuery, (querySnapshot) => {
+            let tempReservas = [];
+
+            querySnapshot.forEach((doc) => {
+                const data = doc.data();
+                const roomID = data.habitacion ? data.habitacion.toLowerCase() : null;
+                const entradaString = data.entrada;
+                const salidaString = data.salida;
+
+                if (roomID && ROOM_INVENTORY[roomID] && entradaString && salidaString) {
+                    tempReservas.push({
+                        habitacion: roomID,
+                        entrada: entradaString,
+                        salida: salidaString,
+                        cantidad: data.unidades_reservadas || 1,
+                        tipo: 'Reserva'
+                    });
+                }
+            });
+
+            currentBloqueos = currentBloqueos.filter(b => b.tipo === 'Bloqueo Manual');
+            currentBloqueos = currentBloqueos.concat(tempReservas);
+
+            renderInventoryCalendar(currentDisplayDate);
+        });
+    }
+
+    function initializeInventoryCalendar() {
+        // Inicia la carga y escucha de cambios en ambas colecciones
+        loadInventoryBlocks();
+    }
+
+    function changeMonth(delta) {
+        currentDisplayDate.setMonth(currentDisplayDate.getMonth() + delta);
+        renderInventoryCalendar(currentDisplayDate);
+    }
+
+    function renderInventoryCalendar(date) {
+        calendarLoader.classList.add('hidden');
+        calendarError.classList.add('hidden');
+        inventoryCalendarContainer.innerHTML = '';
+        
+        const year = date.getFullYear();
+        const month = date.getMonth(); // 0-11
+        
+        currentMonthYear.textContent = `${new Date(year, month).toLocaleString('es-ES', { month: 'long', year: 'numeric' })}`;
+        
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+        // definimos ancho columna izquierda y ancho por día (coincide con tailwind w-8)
+        const leftColPx = 150;
+        const dayPx = 32;
+
+        // GRID con columna fija + N días — usamos template inline para alinear correctamente
+        // Header
+        let html = `<div class="grid gap-1 bg-white z-10 border-b pb-2" style="grid-template-columns: ${leftColPx}px repeat(${daysInMonth}, ${dayPx}px);">`;
+        html += `<div class="min-w-[${leftColPx}px] font-bold text-left text-sm text-[#1F3333] pt-2 px-2">Habitación</div>`;
+
+        const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+        for (let i = 1; i <= daysInMonth; i++) {
+            const dayOfWeek = new Date(year, month, i).getDay();
+            html += `<div class="text-center text-xs font-semibold text-[#8B9D6C] flex flex-col justify-center items-center h-12">
+                        <span class="text-xs">${dayNames[dayOfWeek]}</span>
+                        <span class="font-bold text-sm text-[#1F3333]">${i}</span>
+                    </div>`;
+        }
+        html += `</div>`;
+
+        // Filas por Tipo de Habitación
+        ROOM_TYPES.forEach(roomID => { 
+            const roomData = ROOM_DATA[roomID]; 
+            if (!roomData) return;
+
+            const roomName = roomData.nombre;
+            const roomUnits = roomData.unidades;
+
+            html += `<div class="grid gap-1 mt-1 border-t pt-1 items-center" style="grid-template-columns: ${leftColPx}px repeat(${daysInMonth}, ${dayPx}px);">`;
+            html += `<div class="font-medium text-sm text-[#1F3333] min-w-[${leftColPx}px] p-2 bg-[#FAF9F6]">${roomName} <span class="text-xs text-[#8B9D6C]">(${roomUnits} uds.)</span></div>`;
+
+            for (let day = 1; day <= daysInMonth; day++) {
+                const cellDateString = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                const cellDate = createLocalTimeDate(cellDateString);
+                // for safety normalize hours
+                cellDate.setHours(0,0,0,0);
+
+                let blockedCount = 0;
+
+                if (cellDate) { 
+                    currentBloqueos.forEach(bloqueo => {
+                        if (bloqueo.habitacion === roomID) {
+                            const start = createLocalTimeDate(bloqueo.entrada);
+                            const end = createLocalTimeDate(bloqueo.salida);
+
+                            if (start && end) {
+                                // normalizamos horas
+                                start.setHours(0,0,0,0);
+                                end.setHours(0,0,0,0);
+
+                                // ======= CORRECCIÓN: usamos rango INCLUSIVO [start, end]
+                                // así si bloqueás 18 -> 20, se marcarán 18,19 y 20
+                                if (cellDate.getTime() >= start.getTime() && cellDate.getTime() <= end.getTime()) {
+                                    blockedCount += bloqueo.cantidad;
+                                }
+                            }
+                        }
+                    });
+                }
+
+                let classes = 'h-8 mx-auto rounded-md flex items-center justify-center';
+                let tooltip = '';
+
+                if (blockedCount === 0) {
+                    classes += ' bg-green-400';
+                    tooltip = 'Disponible';
+                } else if (blockedCount < roomUnits) {
+                    classes += ' bg-yellow-400';
+                    tooltip = `Bloqueo Parcial: ${blockedCount} de ${roomUnits} uds. reservadas.`;
+                } else {
+                    classes += ' bg-red-500';
+                    tooltip = `SIN DISPONIBILIDAD: ${blockedCount} de ${roomUnits} uds. reservadas.`;
+                }
+
+                html += `<div class="${classes}" title="${tooltip}" style="width:${dayPx}px;"></div>`;
+            }
+
+            html += `</div>`;
+        });
+
+        inventoryCalendarContainer.innerHTML = html;
+    }
+
+    // --- Lógica de la Tabla de Reservas (Arreglo de índice) ---
+    function initializeReservasTable(db, reservasTbody, loadingReservas, reservasError) {
+        const reservasRef = collection(db, `artifacts/${appId}/public/data/reservas_clientes`);
+        const q = query(reservasRef, orderBy('timestamp', 'desc'));
+
+        onSnapshot(q, (querySnapshot) => {
+            loadingReservas.classList.add('hidden');
+            reservasError.classList.add('hidden');
+            reservasTbody.innerHTML = '';
+
+            let hasReservationsToDisplay = false;
+
+            querySnapshot.forEach((doc) => {
+                const data = doc.data();
+                if (data.estado !== 'Solicitado' && data.estado !== 'Confirmado') return;
+
+                hasReservationsToDisplay = true;
+                const id = doc.id;
+                const roomID = data.habitacion ? data.habitacion.toLowerCase() : 'desconocida';
+                const roomData = ROOM_DATA[roomID] || { nombre: 'Desconocida' };
+                const habitacionNombre = roomData.nombre;
+
+                let statusClass = '';
+                switch (data.estado) {
+                    case 'Solicitado':
+                        statusClass = 'bg-yellow-100 text-yellow-800';
+                        break;
+                    case 'Confirmado':
+                        statusClass = 'bg-green-100 text-green-800';
+                        break;
+                    case 'Cancelado':
+                        statusClass = 'bg-red-100 text-red-800';
+                        break;
+                    default:
+                        statusClass = 'bg-gray-100 text-gray-800';
+                }
+
+                const row = `
+                    <tr data-id="${id}" class="hover:bg-gray-50 transition duration-150">
+                        <td class="px-4 py-4 whitespace-nowrap text-sm font-medium text-[#1F3333]">${id.substring(0, 8)}...</td>
+                        <td class="px-4 py-4 whitespace-nowrap text-sm text-[#4F382B] font-semibold">${data.nombreContacto}</td>
+                        <td class="px-4 py-4 whitespace-nowrap text-sm text-[#4F382B] font-semibold">${data.habitacion}</td>
+                        <td class="px-4 py-4 whitespace-nowrap text-sm text-[#4F382B]">
+                            <span class="font-bold">${data.entrada}</span> a <span class="font-bold">${data.salida}</span>
+                        </td>
+                        <td class="px-4 py-4 whitespace-nowrap text-sm text-[#4F382B] text-center">${data.huespedes || 1}</td>
+                        <td class="px-4 py-4 text-sm text-[#4F382B]">
+                            <div class="truncate max-w-[150px] font-bold">${data.telefonoContacto || 'N/A'}</div>
+                            <div class="truncate max-w-[150px] text-xs text-gray-500">${data.emailContacto}</div>
+                        </td>
+                        <td class="px-4 py-4 whitespace-nowrap text-sm text-[#1F3333] font-bold">USD $${(data.precioTotal || 0).toFixed(2)}</td>
+                        <td class="px-4 py-4 whitespace-nowrap">
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}">
+                                ${data.estado}
+                            </span>
+                        </td>
+                        <td class="px-4 py-4 whitespace-nowrap text-sm font-medium">
+                            <div class="flex space-x-2">
+                                <button data-action="confirm" data-id="${id}" 
+                                    class="action-btn text-green-600 hover:text-green-900 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                                    ${data.estado === 'Confirmado' || data.estado === 'Cancelado' ? 'disabled' : ''}>
+                                    Confirmar
+                                </button>
+                                <button data-action="cancel" data-id="${id}" 
+                                    class="action-btn text-red-600 hover:text-red-900 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                                    ${data.estado === 'Cancelado' ? 'disabled' : ''}>
+                                    Cancelar
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+                reservasTbody.innerHTML += row;
+            });
+
+            if (!hasReservationsToDisplay) {
+                reservasTbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-[#8B9D6C]">No hay reservas recientes para gestionar (Solicitadas o Confirmadas).</td></tr>';
+            }
+
+            attachEventListeners();
+        }, (error) => {
+            console.error("Error al obtener reservas: ", error);
+            loadingReservas.classList.add('hidden');
+            reservasError.textContent = `Error al cargar reservas: ${error.message}`;
+            reservasError.classList.remove('hidden');
+        });
+    }
+
+    // Función para actualizar estado (Reserva y Bloqueo)
+    async function updateReservaStatus(reservaId, newStatus) {
+        if (!db) {
+            console.error("Fallo crítico: No se pudo obtener la instancia de Firestore para actualizar.");
+            document.getElementById('reservas-error').textContent = "Fallo crítico al actualizar: DB no disponible.";
+            document.getElementById('reservas-error').classList.remove('hidden');
+            return;
+        }
+
+        document.querySelectorAll('.action-btn').forEach(btn => btn.disabled = true);
+        
+        try {
+            const reservaDocRef = doc(db, `artifacts/${appId}/public/data/reservas_clientes`, reservaId);
+            await updateDoc(reservaDocRef, {
+                estado: newStatus,
+                fecha_actualizacion: serverTimestamp()
+            });
+
+            console.log(`Reserva ${reservaId} actualizada a estado: ${newStatus}`);
+
+        } catch (error) {
+            console.error("Error al actualizar la reserva:", error);
+            document.getElementById('reservas-error').textContent = `Fallo al actualizar reserva ${reservaId}: ${error.message}`;
+            document.getElementById('reservas-error').classList.remove('hidden');
+        } finally {
+            document.querySelectorAll('.action-btn').forEach(btn => btn.disabled = false);
+        }
+    }
+
+    // Funciones de utilidad para la tabla
+    function attachEventListeners() {
+        document.querySelectorAll('.action-btn').forEach(button => {
+            button.removeEventListener('click', handleActionButtonClick);
+            button.addEventListener('click', handleActionButtonClick);
+        });
+    }
+
+    function handleActionButtonClick(e) {
+        const button = e.currentTarget;
+        const reservaId = button.dataset.id;
+        const action = button.dataset.action;
+        let newStatus = '';
+
+        if (action === 'confirm') {
+            newStatus = 'Confirmado';
+        } else if (action === 'cancel') {
+            newStatus = 'Cancelado';
+        }
+
+        if (reservaId && newStatus) {
+            updateReservaStatus(reservaId, newStatus);
+        }
+    }
+
+    // Iniciar la lógica de inicialización
+    initializeDashboard();
+</script>

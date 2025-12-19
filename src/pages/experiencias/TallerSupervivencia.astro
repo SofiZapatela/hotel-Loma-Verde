@@ -1,0 +1,108 @@
+---
+// src/pages/experiencias/SenderismoInterpretativo.astro
+import Layout from '../../layouts/Layout.astro'; 
+
+
+// --- Datos Específicos de la Experiencia (Baños de Bosque) ---
+
+const experiencia = {
+    titulo: "Taller de Supervivencia Práctica",
+    subtitulo: "Dominando las habilidades esenciales para el entorno natural",
+    duracion: "4 horas (Medio día)",
+    nivel: "Intermedio (Actividad física moderada)",
+    horarios: "Mañana (9:00 AM) o Tarde (2:00 PM)",
+    incluye: [
+        "Instrucción guiada por experto en supervivencia y rescate", 
+        "Materiales necesarios (mapas, brújulas, kits de fuego)", 
+        "Bebida caliente y snack energizante en el campo",
+        "Certificado de finalización del taller básico"
+    ],
+    colores: {
+        principal: "#1F3333", // Verde/Azul oscuro
+         secundario: "#4F382B", // Café oscuro
+         acento: "#8B9D6C" // Verde musgo
+     }
+};
+
+const textoDescripcion = {
+    esencia1: "Este taller está diseñado para transformar su respeto por la naturaleza en conocimiento práctico. Aprenderá las habilidades cruciales para operar de forma segura y eficiente en el entorno boscoso y montañoso, infundiendo confianza en sus futuras exploraciones.",
+   
+    // ⭐ CORRECCIÓN AQUÍ: Cambiamos **Orientación** a <strong>Orientación</strong>, etc. ⭐
+    esencia2: "Nos enfocamos en tres pilares fundamentales: <strong>Orientación</strong> (navegación sin tecnología, lectura de mapa y brújula), <strong>Refugio</strong> (técnicas de construcción rápida y segura) y <strong>Fuego</strong> (métodos primitivos y modernos para generar calor y purificar agua). Es una experiencia práctica, dinámica y profundamente gratificante. Es una actividad diseñada no solo para la seguridad, sino también para el <strong>empoderamiento</strong> personal. Al final del taller, usted tendrá las habilidades necesarias para disfrutar de la montaña con mayor tranquilidad y autosuficiencia."
+};
+
+const testimonio = {
+    cita: "La confianza que me dio este taller es invaluable. Ahora miro el bosque con otros ojos. El módulo de hacer fuego sin fósforos fue increíblemente satisfactorio.",
+    autor: "Javier R."
+};
+---
+
+<Layout title={experiencia.titulo}>
+    <article class="bg-[#FAF9F6] py-20 px-6">
+        <div class="max-w-6xl mx-auto">
+            <header class="text-center mb-16">
+                <h1 class="text-6xl text-[#1F3333] font-cormorant mb-4 leading-tight">
+                    {experiencia.titulo}
+                </h1>
+                <p class="text-xl text-[#8B9D6C] font-semibold tracking-wide">
+                    {experiencia.subtitulo}
+                </p>
+            </header>
+                <section class="mb-16 grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div>
+                    <img src="/mapa-bosque.jpg" alt="Orientacion en el bosque" class="rounded-xl mb-6 object-cover h-100 w-full">
+                    </div>
+                    <div>
+                    <img src="/carpa-bosque.jpg" alt="Refugio en el bosque" class="rounded-xl mb-6 object-cover h-100 w-full">
+                    </div>
+                 </section>
+                    <section class="grid grid-cols-1 lg:grid-cols-3 gap-12 mt-12">
+                        <div class="lg:col-span-2">
+                            <h2 class="text-3xl font-cormorant text-[#1F3333] mb-4 border-b border-[#ECE4D5] pb-2">
+                             Pilares de la Confianza
+                            </h2>
+                        <p class="text-lg text-gray-700">
+                            <span set:html={textoDescripcion.esencia1} />
+                        </p>
+                        
+                        <p class="text-lg text-gray-700">
+                            <span set:html={textoDescripcion.esencia2} />
+                        </p>
+                        </div>
+                         <aside class="p-6 border border-[#ECE4D5] rounded-lg bg-[#ECE4D5]/60 shadow-md">
+                        <h2 class="text-2xl font-cormorant text-[#1F3333] mb-4 border-b border-gray-400/50 pb-2">
+                        Logística del Taller
+                        </h2>
+                        <ul class="space-y-3 mb-6 text-gray-700">
+                            <li>
+                                <strong class="text-[#4F382B]">⏳ Duración:</strong> {experiencia.duracion}
+                            </li>
+                            <li>
+                                <strong class="text-[#4F382B]">🧘 Nivel:</strong> {experiencia.nivel}
+                            </li>
+                            <li>
+                                <strong class="text-[#4F382B]">☀️ Horarios:</strong> {experiencia.horarios}
+                            </li>
+                        </ul>
+                        <h3 class="text-xl font-semibold text-[#4F382B] mb-3">
+                            Incluye
+                        </h3>
+                        <ul class="list-disc list-inside space-y-2 mb-8 text-gray-700 ml-4">
+                            {experiencia.incluye.map(item => (
+                                <li>{item}</li>
+                            ))}
+                        </ul>
+                        <a href="/reserva" class="block w-full text-center px-8 py-3 bg-[#1F3333] text-white font-semibold rounded-full shadow-lg hover:bg-[#4F382B] transition-colors duration-300">
+                            Reservar su Taller
+                        </a>
+                </aside>
+            </section>
+            <section class="mt-20 border-t border-[#ECE4D5] pt-10">
+                <blockquote class="text-center italic text-xl text-[#8B9D6C] max-w-4xl mx-auto">
+                    "{testimonio.cita}"
+                    <footer class="mt-4 text-sm text-[#4F382B]">— Huésped: {testimonio.autor}</footer>
+                </blockquote>
+            </section>
+        </div>
+    </article>
+</Layout>

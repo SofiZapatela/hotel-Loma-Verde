@@ -1,0 +1,71 @@
+---
+import "aos/dist/aos.css";
+
+const experiencias = [
+  {
+    id: 1,
+    titulo: "Senderismo Interpretativo",
+    descripcion: "Caminatas guiadas por expertos en la flora y fauna local. Conecta con el ecosistema y descubre los secretos del bosque.",
+    // Se elimina el campo 'icono' ya que no usaremos emojis/iconos simples
+    colorTexto: "#4F382B",  // Texto café oscuro
+    slug: "experiencias/SenderismoInterpretativo"
+  },
+  {
+    id: 2,
+    titulo: "Baños de Bosque (Shinrin-Yoku)",
+    descripcion: "Sesiones de meditación y atención plena para la relajación profunda, guiadas por la atmósfera sanadora de la naturaleza.",
+    colorTexto: "#4F382B",
+    slug: "experiencias/BañosdeBosque"
+  },
+  {
+    id: 3,
+    titulo: "Taller de Supervivencia Práctica",
+    descripcion: "Aprende habilidades esenciales de montaña: orientación con brújula e identificación de plantas en un entorno seguro.",
+    colorTexto: "#4F382B",
+    slug: "experiencias/TallerSupervivencia"
+  },
+  {
+    id: 4,
+    titulo: "Picnic de Montaña Gourmet",
+    descripcion: "Disfruta de una cesta con productos locales exclusivos en un mirador panorámico con vistas a los picos nevados.",
+    colorTexto: "#4F382B",
+    slug: "experiencias/PicnicGourmet"
+  },
+];
+---
+
+<section id="experiencias" class="bg-[#FAF9F6] py-24 px-6" data-aos="fade-up">
+    <div class="max-w-6xl mx-auto">
+        
+        <div class="text-center mb-16">
+            <p class="text-sm tracking-widest uppercase text-[#8B9D6C] font-semibold">Naturaleza Pura</p>
+            <h2 class="text-4xl sm:text-5xl text-[#1F3333] font-cormorant mt-2">Experiencias Destacadas</h2>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+            {
+                experiencias.map((exp) => (
+                    <div class="p-6 rounded-lg border border-[#1F3333] hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1">
+                        
+                        <div class="mb-4 text-3xl text-[#1F3333] font-serif">
+                            {/* Puedes usar una inicial decorativa o un div vacío para espaciado */}
+                        </div>
+                        
+                        <h3 class="text-2xl font-bold mb-3 font-cormorant leading-snug" style={`color: ${exp.colorTexto};`}>
+                            {exp.titulo}
+                        </h3>
+
+                        <p class="text-base text-gray-700">
+                            {exp.descripcion}
+                        </p>
+                        
+                        <a href={exp.slug} class="mt-4 inline-block text-[#8B9D6C] hover:text-[#4F382B] text-sm font-semibold transition-colors duration-200 border-b border-[#8B9D6C] hover:border-[#4F382B]">
+                        Descubrir más
+                        </a>
+                    </div>
+                ))
+            }
+        </div>
+        
+    </div>
+</section>

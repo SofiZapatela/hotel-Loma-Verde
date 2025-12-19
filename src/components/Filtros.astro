@@ -1,0 +1,57 @@
+---
+import "aos/dist/aos.css";
+
+interface Props {
+  
+  filtros: string[];
+  filtroActivo: string;
+  // El manejo del clic se hará con JS puro.
+}
+
+const { filtros, filtroActivo } = Astro.props;
+
+const idContenedor = "filtro-botones";
+---
+
+<div id={idContenedor} class="flex overflow-x-auto whitespace-nowrap sm:flex sm:space-x-4 mb-8 sm:justify-center">
+  {
+    filtros.map((filtro: unknown) => (
+      <button
+        data-filtro={filtro}
+        class:list={[
+          "px-4 py-2 rounded-full font-bold transition-colors duration-200",
+          {
+            // ESTADO ACTIVO (Fondo: 1F3333, Texto: white)
+            "bg-[#1F3333] text-white shadow-lg": filtro === filtroActivo,
+            
+            // ESTADO INACTIVO (SIN FONDO, Texto: 8B9D6C, Hover: ECE4D5)
+            // Eliminamos "bg-[#ECE4D5]" de aquí.
+            "text-[#1F3333] hover:bg-[#ECE4D5]": filtro !== filtroActivo,
+          },
+        ]}
+      >
+        {filtro}
+      </button>
+    ))
+  }
+</div>
+
+<script>
+  // Script del lado del cliente para manejar la interacción de los filtros
+  const contenedor = document.getElementById("filtro-botones");
+
+  if (contenedor) {
+    contenedor.addEventListener('click', (event) => {
+      const target = event.target as HTMLElement;
+      // Asegúrate de que el clic provino de un botón con el atributo data-filtro
+      const filtro = target.closest('button')?.getAttribute('data-filtro');
+
+      if (filtro) {
+        // Creamos y disparamos un evento personalizado para comunicar el cambio
+        // al componente principal de la galería.
+        const eventoFiltro = new CustomEvent('cambioFiltro', { detail: { nuevoFiltro: filtro } });
+        document.dispatchEvent(eventoFiltro);
+      }
+    });
+  }
+</script>

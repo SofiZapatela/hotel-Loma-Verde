@@ -1,0 +1,98 @@
+---
+// src/pages/gracias-reserva.astro
+import Layout from '../layouts/Layout.astro';
+// Asumimos que has optado por la solución del SVG directo para evitar errores:
+// Si estás usando astro-icon, reemplaza el SVG con el componente <Icon>
+const pageTitle = "¡Solicitud de Reserva Recibida!";
+---
+
+<Layout title={pageTitle}>
+    <section class="py-24 md:py-32 bg-[#FAF9F6] px-4">
+        <div class="max-w-3xl mx-auto text-center p-8 md:p-12 rounded-xl shadow-2xl bg-white border border-[#ECE4D5]">
+            
+            <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                class="w-20 h-20 mx-auto mb-6" 
+                viewBox="0 0 24 24" 
+                stroke-width="1.5" 
+                stroke="currentColor" 
+                fill="none" 
+                stroke-linecap="round" 
+                stroke-linejoin="round"
+            >
+                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                <path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" class="text-[#8B9D6C]" stroke-width="0" fill="currentColor"/>
+                <path d="M9 12l2 2l4 -4" stroke="#FAF9F6" stroke-width="2.5"/>
+            </svg>
+            
+            <h1 class="font-cormorant text-4xl md:text-5xl font-bold text-[#1F3333] mb-4">
+                ¡Gracias por tu Solicitud!
+            </h1>
+            
+            <div id="resumen-reserva" class="text-lg text-[#4F382B] mb-8 font-semibold">
+                </div>
+            <div class="text-left bg-[#ECE4D5] p-6 rounded-lg border border-[#8B9D6C] mb-10">
+                <h3 class="font-semibold text-[#1F3333] mb-3 border-b border-[#8B9D6C] pb-1">
+                    Próximos Pasos Importantes
+                </h3>
+                <ol class="space-y-3 list-decimal list-inside text-gray-700">
+                    <li>
+                        <span class="font-bold">Revisión:</span> Nuestro equipo revisará la disponibilidad final de tu solicitud.
+                    </li>
+                    <li>
+                        <span class="font-bold">Contacto:</span> Te contactaremos directamente a tu correo electrónico o teléfono **dentro de las próximas 24 horas**.
+                    </li>
+                    <li>
+                        <span class="font-bold">Confirmación Final:</span> El correo incluirá la confirmación del precio y las instrucciones detalladas para el pago.
+                    </li>
+                </ol>
+            </div>
+            
+            <a href="/" class="inline-block text-base px-10 py-3 rounded-full 
+                    text-white bg-[#1F3333] font-bold hover:bg-[#4F382B] transition shadow-md">
+                Volver a la Página Principal
+            </a>
+
+        </div>
+    </section>
+</Layout>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // 1. Obtener los parámetros de la URL
+        const params = new URLSearchParams(window.location.search);
+        const resumenDiv = document.getElementById('resumen-reserva');
+        
+        // 2. Extraer los datos y sanitizarlos
+        const habitacion = params.get('habitacion') || 'la habitación seleccionada';
+        const entrada = params.get('entrada') || 'fecha de entrada';
+        const salida = params.get('salida') || 'fecha de salida';
+        
+        // ⭐ CÓDIGO CORREGIDO: Indicamos que 'id' es de tipo 'string' ⭐
+        const formatHabitacion = (id: string): string => {
+            // Función para limpiar y hacer que el texto sea más legible
+            const map: { [key: string]: string } = {
+                'woods': 'Habitación Woods',
+                'green': 'Habitación Green',
+                'lodge': 'Habitación Lodge',
+            };
+            // Usamos el id directamente si no está en el mapa, pero lo pasamos por el mapa.
+            return map[id] || id.charAt(0).toUpperCase() + id.slice(1);
+        };
+        // ⭐ FIN CÓDIGO CORREGIDO ⭐
+        
+        // 3. Crear el mensaje
+        if (resumenDiv && params.has('habitacion')) {
+            // Hacemos un Type Assertion aquí para asegurarnos de que habitacion sea tratado como string
+            const nombreHabitacion = formatHabitacion(habitacion as string);
+
+            resumenDiv.innerHTML = `
+                Tu solicitud de pre-reserva para la ${nombreHabitacion} del ${entrada} al ${salida} ha sido recibida con éxito.
+                <p class="text-sm text-[#8B9D6C] mt-2">Recibirás todos los detalles y el proceso de pago por email.</p>
+            `;
+        } else if (resumenDiv) {
+             // Mensaje genérico si no hay parámetros
+            resumenDiv.textContent = 'Tu solicitud de pre-reserva ha sido procesada con éxito.';
+        }
+    });
+</script>

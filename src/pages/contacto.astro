@@ -1,0 +1,453 @@
+---
+import Layout from '../layouts/Layout.astro';
+import "aos/dist/aos.css";
+
+// OBTENER LAS VARIABLES DE ENTORNO PÚBLICAS
+const firebaseConfig = {
+    apiKey: import.meta.env.PUBLIC_FIREBASE_API_KEY,
+    authDomain: import.meta.env.PUBLIC_FIREBASE_AUTH_DOMAIN,
+    projectId: import.meta.env.PUBLIC_FIREBASE_PROJECT_ID,
+};
+
+// CONVERTIR A STRING para pasar al script
+const firebaseConfigJson = JSON.stringify(firebaseConfig);
+---
+
+<Layout title="Confirmar Reserva | Loma Verde Lodge">
+    <section class="py-16 bg-[#FAF9F6] px-4">
+        <div class="max-w-xl mx-auto p-8 rounded-xl shadow-2xl bg-white border border-[#ECE4D5]">
+            
+            <header class="text-center mb-8">
+                <h2 class="font-cormorant text-3xl font-bold text-[#1F3333]">
+                    Finalizar Solicitud de Reserva
+                </h2>
+                <p class="text-[#8B9D6C] mt-2">
+                    Necesitamos tus datos de contacto para confirmar tu pre-reserva por email.
+                </p>
+            </header>
+
+            <!-- Mensajes de estado -->
+            <div id="reserva-status-message" class="hidden p-4 mb-4 text-sm rounded-lg" role="alert"></div>
+            
+            <form id="reserva-form" class="space-y-6">
+                <!-- Campos de la Reserva (ocultos, pero necesarios para el POST) -->
+                <input type="hidden" id="habitacion" name="habitacion">
+                <input type="hidden" id="entrada" name="entrada">
+                <input type="hidden" id="salida" name="salida">
+                <input type="hidden" id="huespedes" name="huespedes">
+                <input type="hidden" id="precio" name="precio">
+
+                <!-- Detalles de la Pre-Reserva -->
+                <div class="p-4 bg-[#ECE4D5] rounded-lg border border-[#8B9D6C] space-y-2" id="pre-reserva-info">
+                    <h3 class="font-semibold text-[#1F3333]">Detalles de la Pre-Reserva:</h3>
+                    <p class="text-sm text-[#4F382B]"><span class="font-bold">Habitación:</span> <span id="info-habitacion"></span></p>
+                    <p class="text-sm text-[#4F382B]"><span class="font-bold">Check-in:</span> <span id="info-entrada"></span></p>
+                    <p class="text-sm text-[#4F382B]"><span class="font-bold">Check-out:</span> <span id="info-salida"></span></p>
+                    <p class="text-sm text-[#4F382B]"><span class="font-bold">Huéspedes:</span> <span id="info-huespedes"></span></p>
+                    <p class="text-sm text-[#4F382B]"><span class="font-bold">Precio Total:</span> USD <span id="info-precio" class="font-bold"></span></p>
+                </div>
+
+                <!-- Alerta de no disponibilidad (visible solo si falla la verificación) -->
+                <div id="no-disponible-alerta" class="hidden p-4 text-center text-red-800 bg-red-100 rounded-lg font-semibold border border-red-300">
+                    ❌ ¡Inventario Agotado! La Habitación <span id="alerta-habitacion"></span> no está disponible en este momento. Quedan 0 unidades. Por favor, regrese a la página anterior e intente con otra fecha.
+                </div>
+
+                <!-- Campos de Contacto -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="nombre" class="block text-sm font-semibold text-[#1F3333] mb-1">Nombre Completo</label>
+                        <input type="text" id="nombre" name="nombre" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-[#8B9D6C] focus:border-[#8B9D6C]">
+                    </div>
+                    <div>
+                        <label for="email" class="block text-sm font-semibold text-[#1F3333] mb-1">Email</label>
+                        <input type="email" id="email" name="email" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-[#8B9D6C] focus:border-[#8B9D6C]">
+                    </div>
+                </div>
+
+                <div>
+                    <label for="telefono" class="block text-sm font-semibold text-[#1F3333] mb-1">Teléfono</label>
+                    <input type="tel" id="telefono" name="telefono" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-[#8B9D6C] focus:border-[#8B9D6C]">
+                </div>
+
+                <div class="flex justify-center pt-4">
+                    <button type="submit" id="submit-btn" class="inline-block text-base px-16 py-4 rounded-full text-white bg-[#1F3333] font-bold hover:bg-[#4F382B] transition shadow-lg">
+                        Solicitar Reserva
+                    </button>
+                </div>
+            </form>
+
+            <div id="loader-confirm" class="hidden text-center mt-4">
+                <div class="inline-block h-6 w-6 animate-spin rounded-full border-4 border-solid border-current border-r-transparent align-[-0.125em] text-[#1F3333]" role="status">
+                    <span class="absolute m-px h-px w-px overflow-hidden whitespace-nowrap border-0 p-0 [clip:rect(0,0,0,0)]">Cargando...</span>
+                </div>
+                <p class="text-[#1F3333] text-sm mt-1">Guardando solicitud y verificando...</p>
+            </div>
+            
+        </div>
+    </section>
+</Layout>
+
+<div 
+    id="data-reserva-inyeccion" 
+    data-firebase-config={firebaseConfigJson} 
+    style="display:none;">
+</div>
+
+<script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
+    import { getAuth, signInAnonymously, signInWithCustomToken } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
+    import { 
+        getFirestore, 
+        collection, 
+        addDoc, 
+        serverTimestamp, 
+        query, 
+        where, 
+        getDocs, 
+        setLogLevel 
+    } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+
+    // =================================================================
+    // 1. CONFIGURACIÓN E INICIALIZACIÓN
+    // =================================================================
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id'; 
+    const dataInyeccion = document.getElementById('data-reserva-inyeccion');
+    const configStr = dataInyeccion?.dataset.firebaseConfig;
+    let firebaseConfig = {};
+    if (configStr) {
+        try {
+            firebaseConfig = JSON.parse(configStr);
+        } catch (e) {
+            console.error("Error al parsear la configuración de Firebase:", e);
+        }
+    } else if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+        try {
+            firebaseConfig = JSON.parse(__firebase_config);
+        } catch (e) {
+             console.error("Error al parsear la configuración de Firebase global:", e);
+        }
+    }
+    const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+    let db, auth;
+    let isAuthReady = false;
+
+    if (firebaseConfig && firebaseConfig.apiKey) {
+        try {
+            const app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            auth = getAuth(app);
+            setLogLevel('Debug');
+            
+            (async () => {
+                try {
+                    if (initialAuthToken) {
+                        await signInWithCustomToken(auth, initialAuthToken);
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+                    isAuthReady = true;
+                    console.log("Firebase Auth listo.");
+                } catch (error) {
+                    console.error("Error de autenticación (AUTH):", error);
+                }
+            })();
+        } catch (error) {
+            console.error("Error al inicializar Firebase:", error);
+            db = null; 
+        }
+    } else {
+        console.error("Configuración de Firebase faltante. La aplicación no funcionará.");
+    }
+
+    // =================================================================
+    // 2. UTILIDADES DE FECHA Y HABITACIÓN (Re-utilizada de ReservaForm.astro)
+    // =================================================================
+    function parseDate(dateValue) {
+    // Si viene como string "YYYY-MM-DD"
+    if (typeof dateValue === 'string') {
+        const parts = dateValue.split('-');
+        return new Date(Date.UTC(
+            parseInt(parts[0], 10),
+            parseInt(parts[1], 10) - 1,
+            parseInt(parts[2], 10)
+        ));
+    }
+
+    // Si viene como Timestamp de Firestore
+    if (dateValue && typeof dateValue === 'object' && dateValue.seconds !== undefined) {
+        return new Date(dateValue.seconds * 1000);
+    }
+
+    // Si ya es Date
+    if (dateValue instanceof Date) {
+        return new Date(Date.UTC(
+            dateValue.getUTCFullYear(),
+            dateValue.getUTCMonth(),
+            dateValue.getUTCDate()
+        ));
+    }
+
+    // Si es número (milisegundos)
+    if (typeof dateValue === 'number') {
+        const d = new Date(dateValue);
+        return new Date(Date.UTC(
+            d.getUTCFullYear(),
+            d.getUTCMonth(),
+            d.getUTCDate()
+        ));
+    }
+
+    console.error("❌ parseDate recibió un tipo desconocido:", dateValue);
+    return new Date(NaN);
+}
+
+
+    // Datos hardcodeados de las habitaciones para el nombre (idealmente vendrían de un prop)
+    const ROOM_DATA_MOCK = {
+        'woods': { nombre: 'Habitación Woods', unidades: 5 },
+        'green': { nombre: 'Habitación Green', unidades: 1 },
+        'lodge': { nombre: 'Habitación Lodge', unidades: 2 }, 
+    };
+    
+    // Función de verificación de disponibilidad (igual que en ReservaForm.astro)
+    async function checkRoomAvailabilityFinal(habitacionId, fechaEntradaStr, fechaSalidaStr) {
+        if (!isAuthReady || !db) return 0; 
+
+        const habitacionInfo = ROOM_DATA_MOCK[habitacionId];
+        if (!habitacionInfo || habitacionInfo.unidades === 0) return 0;
+        
+        const totalUnits = habitacionInfo.unidades;
+        const startReq = parseDate(fechaEntradaStr); 
+        const endReq = parseDate(fechaSalidaStr);
+        
+        if (endReq <= startReq) return 0;
+        
+        // ⭐️ RUTA CORRECTA PARA BLOQUEOS PÚBLICOS ⭐️
+        const collectionPath = `artifacts/${appId}/public/data/bloqueos`;
+        const bloqueosRef = collection(db, collectionPath);
+        
+        const q = query(bloqueosRef, where('habitacion', '==', habitacionId));
+        
+        const maxRetries = 5;
+        let snapshot;
+
+        for (let i = 0; i < maxRetries; i++) {
+            try {
+                snapshot = await getDocs(q);
+                break; 
+            } catch (error) {
+                if (i === maxRetries - 1) {
+                    console.error("Error de consulta getDocs después de varios reintentos.", error);
+                    throw error;
+                }
+                const delay = Math.pow(2, i) * 1000 + Math.random() * 1000;
+                await new Promise(resolve => setTimeout(resolve, delay));
+            }
+        }
+        
+        if (snapshot.empty) {
+            return totalUnits;
+        }
+        
+        const bloqueosExistentes = snapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                ...data,
+                fecha_inicio: parseDate(data.fecha_inicio),
+                fecha_fin: parseDate(data.fecha_fin),
+                cantidad_bloqueada: data.cantidad_bloqueada || 1 
+            };
+        });
+        
+        let maxBloqueado = 0;
+        let currentDate = new Date(startReq); 
+
+        while (currentDate < endReq) { 
+            let bloqueadoEnDia = 0;
+
+            for (const bloqueo of bloqueosExistentes) {
+                // [Inicio Bloqueo] <= [Día Actual] < [Fin Bloqueo]
+                const isBlocked = currentDate.getTime() >= bloqueo.fecha_inicio.getTime() && 
+                                  currentDate.getTime() < bloqueo.fecha_fin.getTime();
+
+                if (isBlocked) {
+                    bloqueadoEnDia += bloqueo.cantidad_bloqueada;
+                }
+            }
+
+            if (bloqueadoEnDia > maxBloqueado) {
+                maxBloqueado = bloqueadoEnDia;
+            }
+
+            if (maxBloqueado >= totalUnits) {
+                return 0; 
+            }
+
+            currentDate.setUTCDate(currentDate.getUTCDate() + 1);
+        }
+        
+        const unidadesDisponibles = totalUnits - maxBloqueado;
+        return unidadesDisponibles > 0 ? unidadesDisponibles : 0;
+    }
+
+
+    // =================================================================
+    // 3. MANEJO DEL DOM Y ENVÍO DEL FORMULARIO
+    // =================================================================
+
+    document.addEventListener('DOMContentLoaded', async () => {
+        const form = document.getElementById('reserva-form');
+        const submitBtn = document.getElementById('submit-btn');
+        const loader = document.getElementById('loader-confirm');
+        const statusMessageDiv = document.getElementById('reserva-status-message');
+        const noDisponibleAlerta = document.getElementById('no-disponible-alerta');
+        const alertaHabitacion = document.getElementById('alerta-habitacion');
+        
+        // Función para obtener parámetros de la URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const habitacion = urlParams.get('habitacion');
+        const entrada = urlParams.get('entrada');
+        const salida = urlParams.get('salida');
+        const huespedes = urlParams.get('huespedes');
+        const precio = urlParams.get('precio');
+
+        // Función de utilidad para mostrar mensajes de estado
+        const showStatus = (message, isSuccess) => {
+            statusMessageDiv.textContent = message;
+            statusMessageDiv.classList.remove('hidden', 'bg-green-100', 'text-green-800', 'bg-red-100', 'text-red-800');
+            if (isSuccess) {
+                statusMessageDiv.classList.add('bg-green-100', 'text-green-800');
+            } else {
+                statusMessageDiv.classList.add('bg-red-100', 'text-red-800');
+            }
+        };
+
+        // Rellenar campos ocultos y detalles
+        document.getElementById('habitacion').value = habitacion || '';
+        document.getElementById('entrada').value = entrada || '';
+        document.getElementById('salida').value = salida || '';
+        document.getElementById('huespedes').value = huespedes || '';
+        document.getElementById('precio').value = precio || '';
+        
+        const habitacionNombre = ROOM_DATA_MOCK[habitacion]?.nombre || 'Desconocida';
+        
+        document.getElementById('info-habitacion').textContent = habitacionNombre;
+        document.getElementById('info-entrada').textContent = entrada || 'N/A';
+        document.getElementById('info-salida').textContent = salida || 'N/A';
+        document.getElementById('info-huespedes').textContent = huespedes || 'N/A';
+        document.getElementById('info-precio').textContent = precio ? `$${parseFloat(precio).toFixed(2)}` : 'N/A';
+
+
+        // ⭐️ VERIFICACIÓN FINAL Y PANTALLA DE BLOQUEO ⭐️
+        
+        if (!habitacion || !entrada || !salida) {
+            showStatus("❌ Error: Faltan parámetros de reserva.", false);
+            submitBtn.disabled = true;
+            return;
+        }
+
+        // 1. Esperar a la autenticación
+        let attempts = 0;
+        while (!isAuthReady && attempts < 20) { 
+            await new Promise(resolve => setTimeout(resolve, 100));
+            attempts++;
+        }
+
+        if (!isAuthReady) {
+             showStatus("❌ Error de Conexión: La base de datos no está lista. Intente de nuevo.", false);
+             submitBtn.disabled = true;
+             return;
+        }
+
+        // 2. Re-verificación de disponibilidad (La lógica del bug del usuario está aquí)
+        loader.classList.remove('hidden');
+        submitBtn.disabled = true;
+        
+        const unidadesDisponibles = await checkRoomAvailabilityFinal(habitacion, entrada, salida);
+        
+        loader.classList.add('hidden');
+
+        if (unidadesDisponibles === 0) {
+            // No disponible (CORRECTO)
+            noDisponibleAlerta.classList.remove('hidden');
+            alertaHabitacion.textContent = habitacionNombre;
+            form.querySelector('div[id="pre-reserva-info"]').classList.add('opacity-50', 'pointer-events-none');
+            submitBtn.classList.add('hidden');
+            showStatus("❌ ¡Inventario Agotado! No podemos procesar esta reserva.", false);
+            return;
+        } 
+        
+        // Disponible (CONTINÚA)
+        submitBtn.disabled = false;
+
+
+        // 3. Manejo del Envío del Formulario
+        form.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            submitBtn.disabled = true;
+            loader.classList.remove('hidden');
+            statusMessageDiv.classList.add('hidden');
+
+            const nombre = document.getElementById('nombre').value;
+            const email = document.getElementById('email').value;
+            const telefono = document.getElementById('telefono').value;
+            
+            // ⭐️ RUTA CORRECTA PARA RESERVAS PRIVADAS DE USUARIO ⭐️
+            const reservaCollectionPath = `artifacts/${appId}/public/data/reservas_clientes`;
+            const bloqueoCollectionPath = `artifacts/${appId}/public/data/bloqueos`;
+
+
+            try {
+                // A. Guardar en 'reservas' (Colección privada del usuario)
+                const reservaData = {
+                    habitacion: habitacion,
+                    entrada: entrada, 
+                    salida: salida, 
+                    huespedes: parseInt(huespedes),
+                    precioTotal: parseFloat(precio),
+                    nombreContacto: nombre,
+                    emailContacto: email,
+                    telefonoContacto: telefono,
+                    estado: 'Solicitado', // Estado inicial
+                    timestamp: serverTimestamp()
+                };
+                const reservaRef = await addDoc(collection(db, reservaCollectionPath), reservaData);
+
+                // B. Guardar en 'bloqueos' (el registro de inventario, colección pública)
+                const bloqueoData = {
+                    reservaId: reservaRef.id,
+                    habitacion: habitacion,
+                    fecha_inicio: entrada, 
+                    fecha_fin: salida, 
+                    cantidad_bloqueada: 1, 
+                    estado: 'Solicitado', 
+                    timestamp: serverTimestamp()
+                };
+                // ⭐️ USO DE LA RUTA CORREGIDA ⭐️
+                await addDoc(collection(db, bloqueoCollectionPath), bloqueoData); 
+
+                // FIN DE TRANSACCIÓN DE DATOS
+
+                // 4. Éxito
+                loader.classList.add('hidden');
+                showStatus("✅ ¡Solicitud de reserva enviada con éxito y disponibilidad bloqueada! Te contactaremos pronto.", true);
+                form.reset();
+                
+                // Redirigir al dashboard/principal después de 3 segundos
+                setTimeout(() => {
+                    window.location.href = '/gracias-reserva'; 
+                }, 3000);
+
+            } catch (error) {
+                // 5. Error
+                loader.classList.add('hidden');
+                console.error("Error al guardar la reserva en Firestore:", error);
+                showStatus(`❌ Error al enviar la solicitud: ${error.message}. Por favor, inténtalo de nuevo.`, false);
+                submitBtn.disabled = false;
+            }
+        });
+
+    });
+
+</script>

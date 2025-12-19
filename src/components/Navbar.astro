@@ -1,0 +1,88 @@
+---
+interface NavItem {
+  title: string;
+  href: string;
+}
+
+interface Props {
+  siteTitle?: string;
+  navItems?: NavItem[];
+}
+
+const {
+  siteTitle = 'Mi sitio',
+  navItems = [
+    { title: 'Inicio', href: '/' },
+    { title: 'Habitaciones', href: '/#habitaciones' },
+    { title: 'Servicios', href: '/#servicios' },
+    { title: 'Experiencias', href: '/#experiencias' },
+    { title: 'Galeria', href: '/#galeria' },
+    { title: 'Contacto', href: '/#footer' },
+  ] as NavItem[],
+} = Astro.props as Props;
+---
+
+<nav class="bg-[#1F3333] shadow-sm">
+  <div class="max-auto mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="flex justify-center h-16 items-center">
+
+      <!-- izquierda: logo + título -->
+      <div class="flex items-center">
+        <a href="/" class="flex items-center space-x-2">
+          <img src="/logo.png" alt="Logo" class="h-8 w-auto hidden sm:block" />
+        </a>
+
+        <!-- enlaces escritorio -->
+        <div class="hidden sm:flex  sm:ml-100 sm:space-x-6">
+          {navItems.map((item: NavItem) => {
+            return (
+              <a
+                href={item.href}
+                class="inline-flex items-center px-2 pt-1 text-[#DED1C6] font-medium hover:text-[#8B9D6C]">
+                {item.title}
+              </a>
+            );
+          })}
+        </div>
+      </div>
+
+        <!-- botón móvil -->
+        <div class="sm:hidden flex ml-auto">
+          <button id="astro-menu-btn" aria-label="Abrir menú" aria-expanded="false" class="p-2 rounded-md focus:outline-none text-white">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+
+  <!-- menú móvil -->
+  <div id="astro-mobile-menu" class="sm:hidden hidden px-2 pt-2 pb-3 space-y-1 text-white">
+    {navItems.map((item: NavItem) => {
+      return (
+        <a
+          href={item.href}
+          class="block px-3 py-2 rounded-md text-base font-medium hover:bg-gray-50"
+        >
+          {item.title}
+        </a>
+      );
+    })}
+  </div>
+
+  <!-- toggle menú -->
+  <script>
+    const btn = document.getElementById('astro-menu-btn');
+    const menu = document.getElementById('astro-mobile-menu');
+
+    if (btn && menu) {
+      btn.addEventListener('click', () => {
+        const expanded = btn.getAttribute('aria-expanded') === 'true';
+        btn.setAttribute('aria-expanded', String(!expanded));
+        menu.classList.toggle('hidden');
+      });
+    }
+  </script>
+</nav>

@@ -1,0 +1,23 @@
+
+{
+  "bloqueos": [
+    {
+      "habitacionId": "woods",
+      "fechaInicio": "2025-12-24",
+      "fechaFin": "2025-12-27",
+      "motivo": "Navidad"
+    },
+    {
+      "habitacionId": "green",
+      "fechaInicio": "2026-01-01",
+      "fechaFin": "2026-01-05",
+      "motivo": "Mantenimiento"
+    }
+
+  ],
+  "preciosBase": {
+    "woods": 180,
+    "green": 150,
+    "lodge": 220
+  }
+}

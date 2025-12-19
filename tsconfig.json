@@ -1,0 +1,21 @@
+{
+  "extends": "astro/tsconfigs/strict",
+  "compilerOptions": {
+    "moduleResolution": "bundler",
+    "module": "esnext",
+    "target": "es2020",
+    "strict": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    // Add the globals file to recognize the custom variables
+    "typeRoots": [
+        "./node_modules/@types",
+        "./src/globals.d.ts" // Ensure the compiler picks up our global definitions
+    ]
+  },
+  "include": [".astro/types.d.ts", "**/*","src/**/*",
+    "**/*.astro",
+    "**/*.ts"],
+  "exclude": ["dist"]
+}

@@ -1,0 +1,469 @@
+---
+// Define la estructura mínima requerida para las habitaciones
+interface Habitacion {
+    id: string; 
+    nombre: string; 
+    descripcion: string; 
+    precioBase: number; 
+    unidades: number; 
+}
+
+interface Props {
+    habitaciones: Habitacion[];
+    // Astro inyecta el valor de la prop data-firebase-config aquí:
+    'data-firebase-config': string; 
+}
+
+const { habitaciones, 'data-firebase-config': firebaseConfigJson } = Astro.props;
+
+const today = new Date().toISOString().split('T')[0];
+---
+
+<div class="bg-white p-8 md:p-12 rounded-lg shadow-xl border border-[#ECE4D5]">
+    <form id="reserva-form" class="space-y-6">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+
+            <div class="md:col-span-2 grid grid-cols-2 gap-4">
+                <div>
+                    <label for="check-in" class="block text-sm font-semibold text-[#1F3333] mb-1">Entrada</label>
+                    <input type="date" id="check-in" name="check-in" required min={today} class="w-full p-3 border border-gray-300 rounded-lg focus:ring-[#8B9D6C] focus:border-[#8B9D6C]">
+                </div>
+                <div>
+                    <label for="check-out" class="block text-sm font-semibold text-[#1F3333] mb-1">Salida</label>
+                    <input type="date" id="check-out" name="check-out" required min={today} class="w-full p-3 border border-gray-300 rounded-lg focus:ring-[#8B9D6C] focus:focus:border-[#8B9D6C]">
+                </div>
+            </div>
+
+            <div>
+                <label for="habitacion" class="block text-sm font-semibold text-[#1F3333] mb-1">Tipo de Habitación</label>
+                <select id="habitacion" name="habitacion" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-[#8B9D6C] focus:border-[#8B9D6C]">
+                    <option value="">Seleccione una</option>
+                    {habitaciones.map((hab: { id: string | number | string[] | null | undefined; nombre: unknown; unidades: unknown; }) => (
+                        <option value={hab.id}>{hab.nombre} (Unidades: {hab.unidades})</option>
+                    ))}
+                </select>
+            </div>
+
+            <div>
+                <label for="huespedes" class="block text-sm font-semibold text-[#1F3333] mb-1">Huéspedes</label>
+                <input type="number" id="huespedes" name="huespedes" required min="1" max="4" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-[#8B9D6C] focus:border-[#8B9D6C]">
+            </div>
+        </div>
+
+        <div class="text-center pt-4">
+            <button type="submit" id="check-btn" class="inline-block text-base px-16 py-4 rounded-full text-white bg-[#1F3333] font-bold hover:bg-[#4F382B] transition shadow-lg">
+                Verificar Disponibilidad
+            </button>
+        </div>
+    </form>
+
+    <div id="disponibilidad-resultado" class="mt-8 p-4 bg-[#ECE4D5] rounded-lg border border-[#8B9D6C] hidden">
+        <p id="disponibilidad-mensaje" class="font-semibold text-[#1F3333]"></p>
+        <p id="precio-estimado" class="text-sm text-[#4F382B] mt-2"></p>
+    </div>
+    
+    <div id="loader-check" class="hidden text-center mt-4">
+        <div class="inline-block h-6 w-6 animate-spin rounded-full border-4 border-solid border-current border-r-transparent align-[-0.125em] text-[#1F3333]" role="status">
+            <span class="absolute! -m-px! h-px w-px overflow-hidden whitespace-nowrap border-0 p-0 [clip:rect(0,0,0,0)]">Cargando...</span>
+        </div>
+        <p class="text-[#1F3333] text-sm mt-1">Consultando inventario en tiempo real...</p>
+    </div>
+</div>
+
+<div 
+    id="data-reserva-inyeccion" 
+    data-habitaciones={JSON.stringify(habitaciones)}
+    data-firebase-config={firebaseConfigJson} 
+    style="display:none;">
+</div>
+
+<script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
+    import { getAuth, signInAnonymously, signInWithCustomToken } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
+    import { getFirestore, collection, query, getDocs, where, setLogLevel } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+    // Configuraciones globales
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id'; 
+    
+    // ⭐️ Lógica robusta para obtener firebaseConfig ⭐️
+    let firebaseConfig = {};
+    
+    const dataInyeccion = document.getElementById('data-reserva-inyeccion'); 
+
+    if (dataInyeccion) {
+        const configStr = dataInyeccion.dataset.firebaseConfig;
+        if (configStr) {
+            try {
+                firebaseConfig = JSON.parse(configStr);
+                console.log("✅ CONFIGURACIÓN: Usando configuración de Firebase inyectada en el div.");
+            } catch (e) {
+                console.error("❌ ERROR DE PARSEO: Falló al parsear data-firebase-config desde el div.", e);
+            }
+        }
+    }
+
+    if (!firebaseConfig.apiKey) {
+        const configString = typeof __firebase_config !== 'undefined' && __firebase_config ? __firebase_config : '{}';
+        try {
+            firebaseConfig = JSON.parse(configString);
+            console.log("✅ CONFIGURACIÓN: Usando configuración de Firebase de variable global.");
+        } catch (e) {
+             console.error("❌ ERROR DE PARSEO: Falló al parsear __firebase_config. Inicialización fallará.", e);
+        }
+    }
+    
+    const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+    // Inicialización y autenticación de Firebase
+    let db, auth;
+    let isAuthReady = false;
+
+    // ⭐️ BLOQUE DE INICIALIZACIÓN CON MANEJO DE ERRORES ⭐️
+    if (firebaseConfig && firebaseConfig.apiKey) {
+        try {
+            const app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            auth = getAuth(app);
+            setLogLevel('Debug'); // Para ver los logs de Firestore
+            
+            (async () => {
+                try {
+                    if (initialAuthToken) {
+                        await signInWithCustomToken(auth, initialAuthToken);
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+                    isAuthReady = true;
+                    console.log("Firebase Auth listo.");
+                } catch (error) {
+                    console.error("❌ ERROR DE AUTENTICACIÓN (AUTH):", error);
+                }
+            })();
+        } catch (error) {
+            console.error("❌ ERROR CRÍTICO DE FIREBASE: Falló la inicialización (initializeApp/getFirestore). Detalles:", error);
+            db = null; 
+        }
+    } else {
+        console.error("❌ ERROR DE CONFIGURACIÓN: 'firebaseConfig' o 'apiKey' faltante. La verificación de disponibilidad en tiempo real no funcionará.");
+    }
+    
+    // =================================================================================
+    // ⭐️ FUNCIONES DE VERIFICACIÓN DE INVENTARIO (Lógica de Firestore) ⭐️
+    // =================================================================================
+
+    /**
+     * Convierte una fecha string 'YYYY-MM-DD' a Date normalizada a medianoche UTC.
+     * CRUCIAL para evitar errores de zona horaria en los rangos.
+     */
+
+    function parseDate(dateValue) {
+    // Si viene como string "YYYY-MM-DD"
+    if (typeof dateValue === 'string') {
+        const parts = dateValue.split('-');
+        return new Date(Date.UTC(
+            parseInt(parts[0], 10),
+            parseInt(parts[1], 10) - 1,
+            parseInt(parts[2], 10)
+        ));
+    }
+
+    // Si viene como Timestamp de Firestore
+    if (dateValue && typeof dateValue === 'object' && dateValue.seconds !== undefined) {
+        return new Date(dateValue.seconds * 1000);
+    }
+
+    // Si ya es Date
+    if (dateValue instanceof Date) {
+        return new Date(Date.UTC(
+            dateValue.getUTCFullYear(),
+            dateValue.getUTCMonth(),
+            dateValue.getUTCDate()
+        ));
+    }
+
+    // Si es número (milisegundos)
+    if (typeof dateValue === 'number') {
+        const d = new Date(dateValue);
+        return new Date(Date.UTC(
+            d.getUTCFullYear(),
+            d.getUTCMonth(),
+            d.getUTCDate()
+        ));
+    }
+
+    console.error("❌ parseDate recibió un tipo desconocido:", dateValue);
+    return new Date(NaN);
+}
+
+
+    /**
+     * Verifica la disponibilidad de una unidad de una habitación en un rango de fechas,
+     * consultando los bloqueos en la base de datos en tiempo real.
+     * @param {string} habitacionId - El ID de la habitación.
+     * @param {string} fechaEntradaStr - Fecha de entrada 'YYYY-MM-DD'.
+     * @param {string} fechaSalidaStr - Fecha de salida 'YYYY-MM-DD'.
+     * @returns {Promise<number>} - Número de unidades disponibles para el rango completo (0 si no hay disponibilidad).
+     */
+    async function checkRoomAvailabilityLive(habitacionId, fechaEntradaStr, fechaSalidaStr, habitacionesData) {
+        if (!isAuthReady || !db) return 0; 
+
+        const habitacionInfo = habitacionesData.find(h => h.id === habitacionId);
+        if (!habitacionInfo || habitacionInfo.unidades === 0) return 0;
+        
+        const totalUnits = habitacionInfo.unidades;
+        const startReq = parseDate(fechaEntradaStr); 
+        const endReq = parseDate(fechaSalidaStr);
+        
+        console.log(`🔎 SOLICITUD DE DISPONIBILIDAD: Habitacion ID: ${habitacionId}, Rango: [${fechaEntradaStr} (Inclusivo) a ${fechaSalidaStr} (Exclusivo)].`); // LOG 1
+        
+        if (endReq <= startReq) return 0;
+        
+        const collectionPath = `artifacts/${appId}/public/data/bloqueos`;
+        const bloqueosRef = collection(db, collectionPath);
+        
+        const q = query(bloqueosRef, where('habitacion', '==', habitacionId));
+        
+        const maxRetries = 5;
+        let snapshot;
+
+        for (let i = 0; i < maxRetries; i++) {
+            try {
+                snapshot = await getDocs(q);
+                break; 
+            } catch (error) {
+                if (i === maxRetries - 1) {
+                    console.error("❌ ERROR FIREBASE: Falló la consulta getDocs después de varios reintentos.", error);
+                    throw error;
+                }
+                const delay = Math.pow(2, i) * 1000 + Math.random() * 1000;
+                await new Promise(resolve => setTimeout(resolve, delay));
+            }
+        }
+        
+        if (snapshot.empty) {
+            console.log(`✅ FIREBASE: Consulta exitosa. No se encontraron bloqueos para la habitación ${habitacionId}.`);
+            return totalUnits;
+        }
+        
+        // ⭐️ LOG 2: VERIFICAR QUÉ BLOQUEOS SE OBTUVIERON ⭐️
+        console.log(`✅ BLOQUEOS OBTENIDOS (${habitacionId}):`, snapshot.docs.map(doc => doc.data()));
+
+        /** @type {Array<{fecha_inicio: Date, fecha_fin: Date, cantidad_bloqueada: number}>} */
+        const bloqueosExistentes = snapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                ...data,
+                // CRUCIAL: Convertir las fechas a objetos Date UNA SOLA VEZ
+                
+                fecha_inicio: parseDate(data.fecha_inicio),
+                fecha_fin: parseDate(data.fecha_fin),
+                cantidad_bloqueada: data.cantidad_bloqueada || 1 
+            };
+        });
+
+        console.log(`✅ PROCESANDO: Se encontraron ${bloqueosExistentes.length} bloqueos para procesar.`);
+        
+        let maxBloqueado = 0;
+        let currentDate = new Date(startReq); // Iniciar el loop desde el día de check-in
+
+        while (currentDate < endReq) { // Iterar hasta (pero sin incluir) el día de check-out
+            let bloqueadoEnDia = 0;
+            const currentDayStr = currentDate.toISOString().split('T')[0];
+
+            // ⭐️ LOG 3: VERIFICAR EL DÍA QUE SE ESTÁ PROCESANDO ⭐️
+            console.log(`   -> DÍA DE CHECK: ${currentDayStr}`); 
+
+            for (const bloqueo of bloqueosExistentes) {
+                // [Inicio Bloqueo] <= [Día Actual] < [Fin Bloqueo]
+                // Se usa getTime() para una comparación robusta de objetos Date
+                const isBlocked = currentDate.getTime() >= bloqueo.fecha_inicio.getTime() && 
+                                  currentDate.getTime() < bloqueo.fecha_fin.getTime();
+
+                if (isBlocked) {
+                    bloqueadoEnDia += bloqueo.cantidad_bloqueada;
+                    // ⭐️ LOG 4: VERIFICAR QUÉ BLOQUEO ESTÁ AFECTANDO AL DÍA ⭐️
+                    console.log(`      *** BLOQUEADO POR: ${bloqueo.reservaId || 'Manual'} (Rango: ${bloqueo.fecha_inicio.toISOString().split('T')[0]} - ${bloqueo.fecha_fin.toISOString().split('T')[0]}), Bloquea: ${bloqueo.cantidad_bloqueada}`);
+                }
+            }
+
+            if (bloqueadoEnDia > maxBloqueado) {
+                maxBloqueado = bloqueadoEnDia;
+            }
+
+            // Optimización: Si se agotan las unidades, salimos inmediatamente
+            if (maxBloqueado >= totalUnits) {
+                console.log(`❌ DISPONIBILIDAD AGOTADA: Día: ${currentDayStr}. Bloqueado: ${maxBloqueado}/${totalUnits}.`);
+                return 0; // Disponibilidad cero
+            }
+
+            // Pasar al día siguiente (asegura que el avance sea de 24h exactas en UTC)
+            currentDate.setUTCDate(currentDate.getUTCDate() + 1);
+        }
+        
+        // ⭐️ LOG 5: RESULTADO FINAL ⭐️
+        console.log(`✅ RESULTADO FINAL: Máximo Bloqueado: ${maxBloqueado}. Unidades Totales: ${totalUnits}.`);
+
+        // 4. Devolver la Disponibilidad (total - máximo bloqueado)
+        const unidadesDisponibles = totalUnits - maxBloqueado;
+        return unidadesDisponibles > 0 ? unidadesDisponibles : 0;
+    }
+
+
+    // =================================================================================
+    // ⭐️ LÓGICA DE MANEJO DE FORMULARIO (ASYNC CHECK) ⭐️
+    // =================================================================================
+    
+    const waitForAuthReady = async () => {
+        let attempts = 0;
+        if (!db) return false; 
+
+        while (!isAuthReady && attempts < 20) { 
+            await new Promise(resolve => setTimeout(resolve, 100));
+            attempts++;
+        }
+        return isAuthReady;
+    };
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const dataInyeccion = document.getElementById('data-reserva-inyeccion');
+
+        if (!dataInyeccion) return;
+
+        const habitacionesStr = dataInyeccion.dataset.habitaciones ?? '[]';
+        /** @type {Array<Habitacion>} */
+        const habitacionesData = JSON.parse(habitacionesStr);
+
+        const form = document.getElementById('reserva-form');
+        const resultadoDiv = document.getElementById('disponibilidad-resultado');
+        const mensajeP = document.getElementById('disponibilidad-mensaje');
+        const precioP = document.getElementById('precio-estimado');
+        const checkInInput = document.getElementById('check-in');
+        const checkOutInput = document.getElementById('check-out');
+        const habitacionSelect = document.getElementById('habitacion');
+        const huespedesInput = document.getElementById('huespedes');
+        const checkBtn = document.getElementById('check-btn');
+        const loaderCheck = document.getElementById('loader-check');
+
+
+        if (!form || !resultadoDiv || !mensajeP || !precioP || !checkInInput || !checkOutInput || !habitacionSelect || !huespedesInput || !checkBtn) return;
+
+        const actualizarResultado = (mensaje, precio = '', isSuccess = false) => {
+            resultadoDiv.classList.remove('bg-green-100', 'bg-red-100');
+            
+            resultadoDiv.classList.add(isSuccess ? 'bg-green-100' : 'bg-red-100');
+            mensajeP.textContent = mensaje;
+            precioP.textContent = precio;
+            resultadoDiv.classList.remove('hidden');
+        };
+        
+        const toggleLoading = (isLoading) => {
+            checkBtn.disabled = isLoading;
+            checkBtn.classList.toggle('opacity-50', isLoading);
+            loaderCheck.classList.toggle('hidden', !isLoading);
+            resultadoDiv.classList.add('hidden');
+        };
+
+
+        form.addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            if (!db) {
+                actualizarResultado("❌ Error: Sistema de reservas no inicializado.", 'La configuración de Firebase está incompleta o falló la conexión.', false);
+                return;
+            }
+
+            toggleLoading(true);
+
+            if (!await waitForAuthReady()) {
+                toggleLoading(false);
+                actualizarResultado("❌ Error de Conexión: La base de datos no está lista (fallo de autenticación). Intente de nuevo.", 'Por favor, espere un momento y vuelva a hacer clic.', false);
+                return;
+            }
+
+            const checkInValue = checkInInput.value;
+            const checkOutValue = checkOutInput.value;
+            const habitacionId = habitacionSelect.value;
+            const huespedes = parseInt(huespedesInput.value);
+
+            if (!habitacionId || !checkInValue || !checkOutValue) {
+                toggleLoading(false);
+                actualizarResultado("⚠️ Por favor, complete todos los campos de fechas y habitación.");
+                return;
+            }
+            if (parseDate(checkOutValue) <= parseDate(checkInValue)) {
+                toggleLoading(false);
+                actualizarResultado("❌ La fecha de salida debe ser posterior a la fecha de entrada.");
+                return;
+            }
+
+            const habitacionInfo = habitacionesData.find(h => h.id === habitacionId);
+
+            if (!habitacionInfo) {
+                toggleLoading(false);
+                actualizarResultado("❌ Error interno: Habitación no encontrada.");
+                return;
+            }
+
+            try {
+                // ⭐️ LLAMADA ASÍNCRONA A LA LÓGICA DE CHEQUEO EN VIVO ⭐️
+                const unidadesDisponibles = await checkRoomAvailabilityLive(
+                    habitacionId,
+                    checkInValue,
+                    checkOutValue,
+                    habitacionesData
+                );
+                // --------------------------------------------------------------------------------
+
+                toggleLoading(false);
+
+                if (unidadesDisponibles === 0) {
+                    // Caso NO DISPONIBLE
+                    actualizarResultado(
+                        `❌ ¡Lo sentimos! La ${habitacionInfo.nombre} no está disponible en esas fechas.`,
+                        'Por favor, intente con otras fechas o habitación.',
+                        false
+                    );
+                } else {
+                    // ⭐ Caso DISPONIBLE: Mostramos mensaje y botón de confirmación ⭐
+                    const checkIn = parseDate(checkInValue);
+                    const checkOut = parseDate(checkOutValue);
+                    const diffTime = Math.abs(checkOut.getTime() - checkIn.getTime());
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+                    const precioTotal = habitacionInfo.precioBase * diffDays;
+
+                    const urlReserva = `/contacto?habitacion=${habitacionId}&entrada=${checkInValue}&salida=${checkOutValue}&huespedes=${huespedes}&precio=${precioTotal}`;
+
+                    const confirmacionHTML = `
+                        <p class="font-semibold text-green-800">✅ ¡Felicidades! La ${habitacionInfo.nombre} está disponible. Quedan ${unidadesDisponibles} unidades.</p>
+                        <p class="text-sm text-green-600 mt-2">Duración: ${diffDays} noches. Precio estimado total (sin impuestos): USD $${precioTotal}.</p>
+                        <a href="${urlReserva}" class="mt-4 inline-block text-base px-8 py-3 rounded-full text-[#ECE4D5] bg-[#4F382B] font-bold hover:bg-[#1F3333] transition shadow-lg">
+                            Confirmar Reserva
+                        </a>
+                    `;
+
+                    resultadoDiv.innerHTML = confirmacionHTML; // Insertamos el mensaje y el botón
+                    resultadoDiv.classList.remove('hidden');
+                    resultadoDiv.classList.remove('bg-red-100');
+                    resultadoDiv.classList.add('bg-green-100');
+                }
+            } catch (error) {
+                toggleLoading(false);
+                console.error("❌ ERROR AL CONSULTAR DISPONIBILIDAD:", error);
+                actualizarResultado(`❌ Error al consultar disponibilidad: Revise la Consola para más detalles.`, 'Intente de nuevo en unos segundos.', false);
+            }
+        });
+
+        // Asegurar que la salida sea al menos un día después de la entrada
+        checkInInput.addEventListener('change', () => {
+            const entradaDate = parseDate(checkInInput.value);
+            if (entradaDate.getTime()) {
+                const salidaMinDate = new Date(entradaDate);
+                salidaMinDate.setUTCDate(salidaMinDate.getUTCDate() + 1); 
+                checkOutInput.min = salidaMinDate.toISOString().split('T')[0];
+                
+                if (checkOutInput.value && parseDate(checkOutInput.value) <= entradaDate) {
+                    checkOutInput.value = '';
+                }
+            }
+        });
+    });
+</script>

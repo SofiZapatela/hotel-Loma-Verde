@@ -1,0 +1,108 @@
+---
+// src/pages/experiencias/SenderismoInterpretativo.astro
+import Layout from '../../layouts/Layout.astro'; 
+
+
+// --- Datos Específicos de la Experiencia (Baños de Bosque) ---
+
+const experiencia = {
+    titulo: "Picnic de Montaña Gourmet",
+    subtitulo: "Una experiencia culinaria exclusiva con vistas panorámicas al valle",
+    duracion: "2 horas (Tiempo flexible para disfrutar)",
+    nivel: "Muy Bajo (Acceso cómodo y guiado)",
+    horarios: "Almuerzo (1:00 PM) o Atardecer (5:00 PM)",
+    incluye: [
+        "Cesta de picnic gourmet con productos locales de alta calidad", 
+        "Selección de quesos artesanales, embutidos y panadería fina", 
+        "Bebida premium a elección (vino local, cerveza artesanal o espumante)",
+        "Manta, cojines y montaje de mesa baja en el mirador privado"
+    ],
+    colores: {
+        principal: "#1F3333", // Verde/Azul oscuro
+        secundario: "#4F382B", // Café oscuro
+        acento: "#8B9D6C" // Verde musgo
+    }
+};
+
+const textoDescripcion = {
+    esencia1: "Elevamos el concepto de picnic a una experiencia de lujo. Nuestro equipo le guiará a un mirador privado en la montaña, de fácil acceso y con las vistas más impresionantes de la cordillera. Allí encontrará un montaje impecable esperándole, listo para disfrutar.",
+    
+    // ⭐ USO DE HTML EN LUGAR DE MARKDOWN PARA NEGRITAS ⭐
+    esencia2: "El corazón de esta experiencia es la gastronomía. La cesta de picnic incluye una rigurosa selección de <strong>productos regionales premium</strong>, elegidos por nuestro chef para complementar el paisaje. Es la oportunidad perfecta para una celebración íntima o un momento de <strong>desconexión romántica</strong> en un entorno inigualable. Solo tiene que llegar y disfrutar; nosotros nos encargamos de la logística y la recogida."
+};
+
+const testimonio = {
+    cita: "El montaje era hermoso y la comida exquisita, pero lo que realmente nos dejó sin aliento fue la vista. Una experiencia privada y memorable, digna de un hotel de lujo.",
+    autor: "Martín L."
+};
+---
+
+<Layout title={experiencia.titulo}>
+    <article class="bg-[#FAF9F6] py-20 px-6">
+        <div class="max-w-6xl mx-auto">
+            <header class="text-center mb-16">
+                <h1 class="text-6xl text-[#1F3333] font-cormorant mb-4 leading-tight">
+                    {experiencia.titulo}
+                </h1>
+                <p class="text-xl text-[#8B9D6C] font-semibold tracking-wide">
+                    {experiencia.subtitulo}
+                </p>
+            </header>
+                <section class="mb-16 grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div>
+                    <img src="/picnic-montana.jpg" alt="Mesa de picnic gourmet en la montaña" class="rounded-xl mb-6 object-cover h-100 w-full">
+                    </div>
+                    <div>
+                    <img src="/wine-sunset.jpg" alt="Vino al atardecer" class="rounded-xl mb-6 object-cover h-100 w-full">
+                    </div>
+                 </section>
+                    <section class="grid grid-cols-1 lg:grid-cols-3 gap-12 mt-12">
+                        <div class="lg:col-span-2">
+                            <h2 class="text-3xl font-cormorant text-[#1F3333] mb-4 border-b border-[#ECE4D5] pb-2">
+                             El Lujo en el Paisaje
+                            </h2>
+                        <p class="text-lg text-gray-700">
+                            <span set:html={textoDescripcion.esencia1} />
+                        </p>
+                        
+                        <p class="text-lg text-gray-700">
+                            <span set:html={textoDescripcion.esencia2} />
+                        </p>
+                        </div>
+                         <aside class="p-6 border border-[#ECE4D5] rounded-lg bg-[#ECE4D5]/60 shadow-md">
+                        <h2 class="text-2xl font-cormorant text-[#1F3333] mb-4 border-b border-gray-400/50 pb-2">
+                        Detalles Gastronómicos
+                        </h2>
+                        <ul class="space-y-3 mb-6 text-gray-700">
+                            <li>
+                                <strong class="text-[#4F382B]">⏳ Duración:</strong> {experiencia.duracion}
+                            </li>
+                            <li>
+                                <strong class="text-[#4F382B]">🧘 Nivel:</strong> {experiencia.nivel}
+                            </li>
+                            <li>
+                                <strong class="text-[#4F382B]">☀️ Horarios:</strong> {experiencia.horarios}
+                            </li>
+                        </ul>
+                        <h3 class="text-xl font-semibold text-[#4F382B] mb-3">
+                            La Cesta Incluye
+                        </h3>
+                        <ul class="list-disc list-inside space-y-2 mb-8 text-gray-700 ml-4">
+                            {experiencia.incluye.map(item => (
+                                <li>{item}</li>
+                            ))}
+                        </ul>
+                        <a href="/reserva" class="block w-full text-center px-8 py-3 bg-[#1F3333] text-white font-semibold rounded-full shadow-lg hover:bg-[#4F382B] transition-colors duration-300">
+                            Reservar su Picnic
+                        </a>
+                </aside>
+            </section>
+            <section class="mt-20 border-t border-[#ECE4D5] pt-10">
+                <blockquote class="text-center italic text-xl text-[#8B9D6C] max-w-4xl mx-auto">
+                    "{testimonio.cita}"
+                    <footer class="mt-4 text-sm text-[#4F382B]">— Huésped: {testimonio.autor}</footer>
+                </blockquote>
+            </section>
+        </div>
+    </article>
+</Layout>
