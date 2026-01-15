@@ -4,6 +4,7 @@ import "../styles/global.css";
 import AOSInit from "../components/AOSInit.astro";
 import Navbar from "../components/Navbar.astro";
 import Footer from "../components/Footer.astro";
+import DemoBadge from "../components/DemoBadge.astro";
 ---
 
 <!doctype html>
@@ -17,6 +18,7 @@ import Footer from "../components/Footer.astro";
     </head>
      <body>
         <AOSInit client:load />
+        <DemoBadge />
 
         <div class="sticky top-0 z-50">
             <Navbar />
